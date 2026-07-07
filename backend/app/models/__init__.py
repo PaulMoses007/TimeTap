@@ -1,2 +1,3 @@
-from .employee import Employee
-from .attendance import Attendance
+from app.models.employee import Employee
+from app.models.attendance import Attendance
+from app.models.restaurant import Restaurant
