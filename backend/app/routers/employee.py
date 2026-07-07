@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.utils.employee_code import generate_employee_code
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -9,6 +8,8 @@ from app.schemas.employee import (
     EmployeeUpdate,
     EmployeeResponse,
 )
+from app.security.password import hash_password
+from app.utils.employee_code import generate_employee_code
 
 router = APIRouter(
     prefix="/employees",
@@ -36,6 +37,7 @@ def create_employee(
         email=employee.email,
         phone=employee.phone,
         role=employee.role,
+        password_hash=hash_password(employee.password),
     )
 
     db.add(new_employee)
@@ -58,7 +60,11 @@ def get_employee(
     employee_id: int,
     db: Session = Depends(get_db)
 ):
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id)
+        .first()
+    )
 
     if employee is None:
         raise HTTPException(
@@ -75,7 +81,11 @@ def update_employee(
     employee_data: EmployeeUpdate,
     db: Session = Depends(get_db)
 ):
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id)
+        .first()
+    )
 
     if employee is None:
         raise HTTPException(
@@ -88,6 +98,7 @@ def update_employee(
     employee.email = employee_data.email
     employee.phone = employee_data.phone
     employee.role = employee_data.role
+    employee.is_active = employee_data.is_active
 
     db.commit()
     db.refresh(employee)
@@ -100,7 +111,11 @@ def delete_employee(
     employee_id: int,
     db: Session = Depends(get_db)
 ):
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id)
+        .first()
+    )
 
     if employee is None:
         raise HTTPException(
