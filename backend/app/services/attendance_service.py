@@ -85,7 +85,6 @@ class AttendanceService:
         time_difference = attendance.check_out - attendance.check_in
 
         worked_minutes = int(time_difference.total_seconds() // 60)
-
         worked_hours = round(worked_minutes / 60, 2)
 
         attendance.worked_minutes = worked_minutes
@@ -95,3 +94,11 @@ class AttendanceService:
         db.refresh(attendance)
 
         return attendance
+
+
+def get_all_attendance(db: Session):
+    return (
+        db.query(Attendance)
+        .order_by(Attendance.work_date.desc())
+        .all()
+    )

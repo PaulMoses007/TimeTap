@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from app.utils.employee_code import generate_employee_code
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -29,7 +30,7 @@ def create_employee(
     db: Session = Depends(get_db)
 ):
     new_employee = Employee(
-        employee_id=employee.employee_id,
+        employee_id=generate_employee_code(employee.role, db),
         first_name=employee.first_name,
         last_name=employee.last_name,
         email=employee.email,

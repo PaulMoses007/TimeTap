@@ -7,7 +7,10 @@ from app.schemas.attendance import (
     AttendanceCheckOut,
     AttendanceResponse,
 )
-from app.services.attendance_service import AttendanceService
+from app.services.attendance_service import (
+    AttendanceService,
+    get_all_attendance,
+)
 
 router = APIRouter(
     prefix="/attendance",
@@ -43,3 +46,10 @@ def check_out(
         attendance.employee_id,
         db
     )
+
+
+@router.get("/", response_model=list[AttendanceResponse])
+def attendance_history(
+    db: Session = Depends(get_db)
+):
+    return get_all_attendance(db)
