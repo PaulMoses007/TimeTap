@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
+from app.routers.auth import router as auth_router
 
 # Import models
 from app.models.employee import Employee
@@ -25,6 +26,7 @@ app = FastAPI(
 app.include_router(employee_router)
 app.include_router(attendance_router)
 app.include_router(restaurant_router)
+app.include_router(auth_router)
 
 
 @app.get("/")
