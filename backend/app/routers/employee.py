@@ -10,6 +10,7 @@ from app.schemas.employee import (
 )
 from app.security.password import hash_password
 from app.utils.employee_code import generate_employee_code
+from app.security.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/employees",
@@ -49,8 +50,10 @@ def create_employee(
 
 @router.get("/", response_model=list[EmployeeResponse])
 def get_all_employees(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+
     employees = db.query(Employee).all()
     return employees
 
