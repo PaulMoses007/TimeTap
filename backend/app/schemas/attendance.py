@@ -1,19 +1,25 @@
-from datetime import datetime, date
+from datetime import date, datetime
+
 from pydantic import BaseModel
 
 
-class AttendanceCreate(BaseModel):
-    employee_id: int
+# QR Check-In Request
+class AttendanceCheckInRequest(BaseModel):
+    restaurant_id: int
 
 
-class AttendanceCheckOut(BaseModel):
-    employee_id: int
+# QR Check-Out Request
+class AttendanceCheckOutRequest(BaseModel):
+    restaurant_id: int
 
 
+# Attendance Response
 class AttendanceResponse(BaseModel):
     id: int
     employee_id: int
+
     work_date: date
+
     check_in: datetime
     check_out: datetime | None
 

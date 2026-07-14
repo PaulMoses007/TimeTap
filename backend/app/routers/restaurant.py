@@ -1,4 +1,7 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -40,7 +43,7 @@ def create_restaurant(
     db.commit()
     db.refresh(new_restaurant)
 
-    # Generate QR Code
+    # Generate QR Code automatically
     generate_restaurant_qr(
         new_restaurant.id,
         new_restaurant.name
@@ -129,3 +132,37 @@ def delete_restaurant(
     return {
         "message": "Restaurant deleted successfully"
     }
+
+
+@router.get("/{restaurant_id}/qr")
+def get_restaurant_qr(
+    restaurant_id: int,
+    db: Session = Depends(get_db)
+):
+    # Check if restaurant exists
+    restaurant = (
+        db.query(Restaurant)
+        .filter(Restaurant.id == restaurant_id)
+        .first()
+    )
+
+    if restaurant is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Restaurant not found"
+        )
+
+    filepath = f"qrcodes/restaurant_{restaurant_id}.png"
+
+    # Check if QR file exists
+    if not os.path.exists(filepath):
+        raise HTTPException(
+            status_code=404,
+            detail="QR code not found"
+        )
+
+    return FileResponse(
+        path=filepath,
+        media_type="image/png",
+        filename=f"restaurant_{restaurant_id}.png"
+    )

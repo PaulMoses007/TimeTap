@@ -3,14 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.schemas.attendance import (
-    AttendanceCreate,
-    AttendanceCheckOut,
+    AttendanceCheckInRequest,
     AttendanceResponse,
 )
-from app.services.attendance_service import (
-    AttendanceService,
-    get_all_attendance,
-)
+from app.security.dependencies import get_current_user
+from app.services.attendance_service import get_all_attendance
+from app.services.qr_attendance_service import check_in
 
 router = APIRouter(
     prefix="/attendance",
@@ -26,24 +24,15 @@ def get_db():
         db.close()
 
 
-@router.post("/checkin", response_model=AttendanceResponse)
-def check_in(
-    attendance: AttendanceCreate,
+@router.post("/check-in", response_model=AttendanceResponse)
+def employee_check_in(
+    attendance: AttendanceCheckInRequest,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    return AttendanceService.check_in(
-        attendance.employee_id,
-        db
-    )
-
-
-@router.post("/checkout", response_model=AttendanceResponse)
-def check_out(
-    attendance: AttendanceCheckOut,
-    db: Session = Depends(get_db)
-):
-    return AttendanceService.check_out(
-        attendance.employee_id,
+    return check_in(
+        attendance.restaurant_id,
+        current_user,
         db
     )
 
