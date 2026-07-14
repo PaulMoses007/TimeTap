@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.restaurant import Restaurant
+from app.qr.qr_generator import generate_restaurant_qr
 from app.schemas.restaurant import (
     RestaurantCreate,
     RestaurantUpdate,
@@ -38,6 +39,12 @@ def create_restaurant(
     db.add(new_restaurant)
     db.commit()
     db.refresh(new_restaurant)
+
+    # Generate QR Code
+    generate_restaurant_qr(
+        new_restaurant.id,
+        new_restaurant.name
+    )
 
     return new_restaurant
 
