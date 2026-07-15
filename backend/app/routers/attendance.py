@@ -8,7 +8,10 @@ from app.schemas.attendance import (
 )
 from app.security.dependencies import get_current_user
 from app.services.attendance_service import get_all_attendance
-from app.services.qr_attendance_service import check_in
+from app.services.qr_attendance_service import (
+    check_in,
+    check_out,
+)
 
 router = APIRouter(
     prefix="/attendance",
@@ -31,6 +34,19 @@ def employee_check_in(
     db: Session = Depends(get_db)
 ):
     return check_in(
+        attendance.restaurant_id,
+        current_user,
+        db
+    )
+
+
+@router.post("/check-out", response_model=AttendanceResponse)
+def employee_check_out(
+    attendance: AttendanceCheckInRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return check_out(
         attendance.restaurant_id,
         current_user,
         db
