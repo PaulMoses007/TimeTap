@@ -33,7 +33,6 @@ def create_employee(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
-    
     new_employee = Employee(
         employee_id=generate_employee_code(employee.role, db),
         first_name=employee.first_name,
@@ -56,7 +55,6 @@ def get_all_employees(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-
     employees = db.query(Employee).all()
     return employees
 
@@ -64,7 +62,8 @@ def get_all_employees(
 @router.get("/{employee_id}", response_model=EmployeeResponse)
 def get_employee(
     employee_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     employee = (
         db.query(Employee)
@@ -88,7 +87,6 @@ def update_employee(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
-    
     employee = (
         db.query(Employee)
         .filter(Employee.id == employee_id)
@@ -120,7 +118,6 @@ def delete_employee(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
-    
     employee = (
         db.query(Employee)
         .filter(Employee.id == employee_id)
