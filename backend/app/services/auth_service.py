@@ -41,12 +41,21 @@ class AuthService:
                 detail="Employee account is inactive"
             )
 
+        # Version 2.0
+        # Employee must be approved by a manager
+        if employee.approval_status != "Approved":
+            raise HTTPException(
+                status_code=403,
+                detail="Your account is waiting for manager approval."
+            )
+
         employee.last_login = datetime.utcnow()
 
         db.commit()
 
         token = create_access_token(
             {
+                "id": employee.id,
                 "sub": employee.email,
                 "employee_id": employee.employee_id,
                 "role": employee.role,

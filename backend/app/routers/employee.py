@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -55,8 +57,52 @@ def get_all_employees(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    employees = db.query(Employee).all()
-    return employees
+    return db.query(Employee).all()
+
+
+@router.get("/pending", response_model=list[EmployeeResponse])
+def get_pending_employees(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    return (
+        db.query(Employee)
+        .filter(Employee.approval_status == "Pending")
+        .all()
+    )
+
+
+# -----------------------------
+# NEW: Approve Employee
+# -----------------------------
+@router.put("/{employee_id}/approve", response_model=EmployeeResponse)
+def approve_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id)
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found"
+        )
+
+    employee.approval_status = "Approved"
+    employee.is_verified = True
+
+    employee.approved_by = current_user["id"]
+    employee.approved_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(employee)
+
+    return employee
 
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)

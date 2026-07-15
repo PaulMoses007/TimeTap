@@ -12,6 +12,22 @@ class EmployeeCreate(BaseModel):
     password: str
 
 
+# Version 2.0
+# Employee self-registration
+class EmployeeRegister(BaseModel):
+    restaurant_id: int
+
+    first_name: str
+    last_name: str
+
+    email: EmailStr
+    phone: str
+
+    role: str
+
+    password: str
+
+
 class EmployeeUpdate(BaseModel):
     first_name: str
     last_name: str
@@ -32,6 +48,10 @@ class EmployeeResponse(BaseModel):
     phone: str
 
     role: str
+
+    restaurant_id: int | None
+
+    approval_status: str
 
     is_active: bool
     is_verified: bool

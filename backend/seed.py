@@ -8,11 +8,15 @@ def seed_manager():
     db = SessionLocal()
 
     try:
-        # Check if any employees already exist
-        employee_count = db.query(Employee).count()
+        # Check if a manager already exists
+        existing_manager = (
+            db.query(Employee)
+            .filter(Employee.role == "Manager")
+            .first()
+        )
 
-        if employee_count > 0:
-            print("Employees already exist. Seed skipped.")
+        if existing_manager:
+            print("Manager already exists. Seed skipped.")
             return
 
         manager = Employee(
@@ -23,6 +27,11 @@ def seed_manager():
             phone="+37120000000",
             role="Manager",
             password_hash=hash_password("Welcome123"),
+
+            # Version 2.0 fields
+            restaurant_id=None,
+            approval_status="Approved",
+
             is_active=True,
             is_verified=True,
         )
