@@ -104,6 +104,35 @@ def approve_employee(
 
     return employee
 
+@router.put("/{employee_id}/reject", response_model=EmployeeResponse)
+def reject_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == employee_id)
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found"
+        )
+
+    employee.approval_status = "Rejected"
+    employee.is_verified = False
+
+    employee.approved_by = current_user["id"]
+    employee.approved_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(employee)
+
+    return employee
+
 
 @router.get("/{employee_id}", response_model=EmployeeResponse)
 def get_employee(
