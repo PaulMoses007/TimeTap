@@ -6,12 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
 from app.models.restaurant import Restaurant
+from app.models.employee import Employee
 from app.qr.qr_generator import generate_restaurant_qr
+
 from app.schemas.restaurant import (
     RestaurantCreate,
     RestaurantUpdate,
     RestaurantResponse,
 )
+from app.schemas.employee import EmployeeResponse
 
 router = APIRouter(
     prefix="/restaurants",
@@ -79,6 +82,38 @@ def get_restaurant(
     return restaurant
 
 
+# ---------------------------------------
+# NEW: Get Employees of a Restaurant
+# ---------------------------------------
+@router.get(
+    "/{restaurant_id}/employees",
+    response_model=list[EmployeeResponse]
+)
+def get_restaurant_employees(
+    restaurant_id: int,
+    db: Session = Depends(get_db)
+):
+    restaurant = (
+        db.query(Restaurant)
+        .filter(Restaurant.id == restaurant_id)
+        .first()
+    )
+
+    if restaurant is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Restaurant not found"
+        )
+
+    employees = (
+        db.query(Employee)
+        .filter(Employee.restaurant_id == restaurant_id)
+        .all()
+    )
+
+    return employees
+
+
 @router.put("/{restaurant_id}", response_model=RestaurantResponse)
 def update_restaurant(
     restaurant_id: int,
@@ -139,7 +174,6 @@ def get_restaurant_qr(
     restaurant_id: int,
     db: Session = Depends(get_db)
 ):
-    # Check if restaurant exists
     restaurant = (
         db.query(Restaurant)
         .filter(Restaurant.id == restaurant_id)
@@ -154,7 +188,6 @@ def get_restaurant_qr(
 
     filepath = f"qrcodes/restaurant_{restaurant_id}.png"
 
-    # Check if QR file exists
     if not os.path.exists(filepath):
         raise HTTPException(
             status_code=404,
