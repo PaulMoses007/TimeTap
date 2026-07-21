@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, timedelta
+import calendar
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -14,6 +15,8 @@ from app.schemas.attendance import (
     AttendanceResponse,
 )
 from app.schemas.today_attendance import TodayAttendanceResponse
+from app.schemas.weekly_attendance import WeeklyAttendanceResponse
+from app.schemas.monthly_attendance import MonthlyAttendanceResponse
 
 from app.security.dependencies import get_current_user
 from app.security.roles import require_manager
@@ -39,7 +42,7 @@ def get_db():
 
 
 # ----------------------------------------------------
-# Today's Attendance (Manager Dashboard)
+# Today's Attendance
 # ----------------------------------------------------
 @router.get(
     "/today",
@@ -101,6 +104,130 @@ def get_today_attendance(
                 "status": status,
                 "check_in": check_in_time,
                 "check_out": check_out_time,
+            }
+        )
+
+    return results
+
+
+# ----------------------------------------------------
+# Weekly Attendance
+# ----------------------------------------------------
+@router.get(
+    "/weekly",
+    response_model=list[WeeklyAttendanceResponse]
+)
+def get_weekly_attendance(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    today = date.today()
+    start_date = today - timedelta(days=6)
+
+    employees = db.query(Employee).all()
+
+    results = []
+
+    for employee in employees:
+
+        restaurant_name = "Not Assigned"
+
+        if employee.restaurant_id:
+            restaurant = (
+                db.query(Restaurant)
+                .filter(Restaurant.id == employee.restaurant_id)
+                .first()
+            )
+
+            if restaurant:
+                restaurant_name = restaurant.name
+
+        attendance_records = (
+            db.query(Attendance)
+            .filter(
+                Attendance.employee_id == employee.id,
+                Attendance.work_date >= start_date,
+                Attendance.work_date <= today
+            )
+            .all()
+        )
+
+        unique_days = {record.work_date for record in attendance_records}
+
+        days_present = len(unique_days)
+        days_absent = max(0, 7 - days_present)
+
+        results.append(
+            {
+                "employee_id": employee.employee_id,
+                "first_name": employee.first_name,
+                "last_name": employee.last_name,
+                "role": employee.role,
+                "restaurant": restaurant_name,
+                "days_present": days_present,
+                "days_absent": days_absent,
+            }
+        )
+
+    return results
+
+
+# ----------------------------------------------------
+# Monthly Attendance
+# ----------------------------------------------------
+@router.get(
+    "/monthly",
+    response_model=list[MonthlyAttendanceResponse]
+)
+def get_monthly_attendance(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    today = date.today()
+    start_date = today.replace(day=1)
+
+    employees = db.query(Employee).all()
+
+    results = []
+
+    for employee in employees:
+
+        restaurant_name = "Not Assigned"
+
+        if employee.restaurant_id:
+            restaurant = (
+                db.query(Restaurant)
+                .filter(Restaurant.id == employee.restaurant_id)
+                .first()
+            )
+
+            if restaurant:
+                restaurant_name = restaurant.name
+
+        attendance_records = (
+            db.query(Attendance)
+            .filter(
+                Attendance.employee_id == employee.id,
+                Attendance.work_date >= start_date,
+                Attendance.work_date <= today
+            )
+            .all()
+        )
+
+        unique_days = {record.work_date for record in attendance_records}
+
+        days_present = len(unique_days)
+        days_absent = max(0, today.day - days_present)
+
+        results.append(
+            {
+                "employee_id": employee.employee_id,
+                "first_name": employee.first_name,
+                "last_name": employee.last_name,
+                "role": employee.role,
+                "restaurant": restaurant_name,
+                "days_present": days_present,
+                "days_absent": days_absent,
             }
         )
 
