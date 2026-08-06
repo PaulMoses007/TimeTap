@@ -84,3 +84,4 @@ tempCodeRunnerFile.py
 # TimeTap Specific
 # ------------------------------------------
 backend/timetap.db
+node_modules
