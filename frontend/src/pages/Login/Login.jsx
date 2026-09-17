@@ -1,20 +1,25 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
+  Alert,
   Avatar,
   Box,
   Button,
+  CircularProgress,
   Container,
   Paper,
   TextField,
   Typography,
-  Alert,
-  CircularProgress,
 } from "@mui/material";
+
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import { login } from "../../services/authService";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -30,24 +35,17 @@ function Login() {
     try {
       const data = await login(email, password);
 
-      // Save JWT Token
       localStorage.setItem(
         "access_token",
         data.access_token
       );
 
-      alert("Login successful!");
-
-      // Redirect to Dashboard
       window.location.href = "/dashboard";
-
     } catch (err) {
-
       setError(
         err.response?.data?.detail ||
-        "Invalid email or password."
+          "Invalid email or password."
       );
-
     } finally {
       setLoading(false);
     }
@@ -95,7 +93,10 @@ function Login() {
           {error && (
             <Alert
               severity="error"
-              sx={{ width: "100%", mb: 2 }}
+              sx={{
+                width: "100%",
+                mb: 2,
+              }}
             >
               {error}
             </Alert>
@@ -104,10 +105,13 @@ function Login() {
           <Box
             component="form"
             onSubmit={handleLogin}
-            sx={{ width: "100%" }}
+            sx={{
+              width: "100%",
+            }}
           >
             <TextField
               fullWidth
+              required
               label="Email"
               margin="normal"
               value={email}
@@ -118,6 +122,7 @@ function Login() {
 
             <TextField
               fullWidth
+              required
               type="password"
               label="Password"
               margin="normal"
@@ -131,7 +136,9 @@ function Login() {
               fullWidth
               variant="contained"
               size="large"
-              sx={{ mt: 3 }}
+              sx={{
+                mt: 3,
+              }}
               disabled={loading}
               type="submit"
             >
@@ -143,6 +150,23 @@ function Login() {
               ) : (
                 "Login"
               )}
+            </Button>
+
+            <Typography
+              textAlign="center"
+              color="text.secondary"
+              sx={{ mt: 3 }}
+            >
+              Don't have an account?
+            </Typography>
+
+            <Button
+              fullWidth
+              variant="outlined"
+              sx={{ mt: 1 }}
+              onClick={() => navigate("/register")}
+            >
+              Register as Employee
             </Button>
           </Box>
         </Box>
