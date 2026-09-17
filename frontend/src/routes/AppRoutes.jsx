@@ -4,6 +4,7 @@ import Login from "../pages/Login/Login";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import EmployeeList from "../pages/Employees/EmployeeList";
 import Register from "../pages/Register/Register";
+import EmployeeDashboard from "../pages/EmployeeDashboard/EmployeeDashboard";
 
 function AppRoutes() {
   return (
@@ -24,6 +25,11 @@ function AppRoutes() {
         <Route
           path="/register"
           element={<Register />}
+        />
+
+        <Route
+          path="/employee-dashboard"
+          element={<EmployeeDashboard />}
         />
       </Routes>
     </BrowserRouter>

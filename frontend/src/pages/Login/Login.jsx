@@ -17,6 +17,21 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import { login } from "../../services/authService";
 
+function decodeToken(token) {
+  try {
+    const payload = token.split(".")[1];
+
+    const decodedPayload = atob(
+      payload.replace(/-/g, "+").replace(/_/g, "/")
+    );
+
+    return JSON.parse(decodedPayload);
+  } catch (error) {
+    console.error("Failed to decode token:", error);
+    return null;
+  }
+}
+
 function Login() {
   const navigate = useNavigate();
 
@@ -40,10 +55,25 @@ function Login() {
         data.access_token
       );
 
-      window.location.href = "/dashboard";
+      const user = decodeToken(data.access_token);
+
+      if (!user) {
+        throw new Error(
+          "Unable to read user information."
+        );
+      }
+
+      if (user.role === "Manager") {
+        navigate("/dashboard");
+      } else {
+        navigate("/employee-dashboard");
+      }
     } catch (err) {
+      console.error(err);
+
       setError(
         err.response?.data?.detail ||
+          err.message ||
           "Invalid email or password."
       );
     } finally {

@@ -267,10 +267,53 @@ def employee_check_out(
 
 
 # ----------------------------------------------------
+# Employee Attendance History
+# ----------------------------------------------------
+@router.get(
+    "/my",
+    response_model=list[AttendanceResponse]
+)
+def my_attendance_history(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    employee = (
+        db.query(Employee)
+        .filter(
+            Employee.email == current_user["sub"]
+        )
+        .first()
+    )
+
+    if employee is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found"
+        )
+
+    return (
+        db.query(Attendance)
+        .filter(
+            Attendance.employee_id == employee.id
+        )
+        .order_by(
+            Attendance.work_date.desc()
+        )
+        .all()
+    )
+
+
+# ----------------------------------------------------
 # Attendance History
 # ----------------------------------------------------
-@router.get("/", response_model=list[AttendanceResponse])
+@router.get(
+    "/",
+    response_model=list[AttendanceResponse]
+)
 def attendance_history(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
 ):
     return get_all_attendance(db)
