@@ -95,26 +95,37 @@ function Dashboard() {
       text: "Dashboard",
       icon: <DashboardIcon />,
       active: true,
+      path: "/dashboard",
     },
     {
       text: "Employees",
       icon: <PeopleIcon />,
+      active: false,
+      path: "/employees",
     },
     {
       text: "Attendance",
       icon: <AccessTimeIcon />,
+      active: false,
+      path: "/manager-attendance",
     },
     {
       text: "Restaurants",
       icon: <RestaurantIcon />,
+      active: false,
+      path: "/restaurants",
     },
     {
       text: "Reports",
       icon: <AssessmentIcon />,
+      active: false,
+      path: "/reports",
     },
     {
       text: "Settings",
       icon: <SettingsIcon />,
+      active: false,
+      path: "/settings",
     },
   ];
 
@@ -235,15 +246,7 @@ function Dashboard() {
             <ListItemButton
               key={item.text}
               selected={item.active}
-              onClick={() => {
-                if (item.text === "Dashboard") {
-                  navigate("/dashboard");
-                }
-
-                if (item.text === "Employees") {
-                  navigate("/employees");
-                }
-              }}
+              onClick={() => navigate(item.path)}
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
