@@ -7,6 +7,7 @@ import Register from "../pages/Register/Register";
 import EmployeeDashboard from "../pages/EmployeeDashboard/EmployeeDashboard";
 import EmployeeAttendance from "../pages/EmployeeAttendance/EmployeeAttendance";
 import RestaurantManagement from "../pages/Restaurants/RestaurantManagement";
+import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
 
 function AppRoutes() {
   return (
@@ -25,39 +26,26 @@ function AppRoutes() {
             MANAGER
         ========================== */}
 
-        {/* Manager Dashboard */}
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* Manager - Employees */}
         <Route
           path="/employees"
           element={<EmployeeList />}
         />
 
-        {/* Manager - Restaurants */}
+        <Route
+          path="/manager-attendance"
+          element={<ManagerAttendance />}
+        />
+
         <Route
           path="/restaurants"
           element={<RestaurantManagement />}
         />
 
-        {/* Manager - Attendance */}
-        <Route
-          path="/manager-attendance"
-          element={
-            <div style={{ padding: "40px" }}>
-              <h2>Manager Attendance</h2>
-              <p>
-                Manager attendance page will be
-                added next.
-              </p>
-            </div>
-          }
-        />
-
-        {/* Manager - Reports */}
         <Route
           path="/reports"
           element={
@@ -70,7 +58,6 @@ function AppRoutes() {
           }
         />
 
-        {/* Manager - Settings */}
         <Route
           path="/settings"
           element={
@@ -86,6 +73,7 @@ function AppRoutes() {
         {/* =========================
             EMPLOYEE REGISTRATION
         ========================== */}
+
         <Route
           path="/register"
           element={<Register />}
@@ -95,13 +83,11 @@ function AppRoutes() {
             EMPLOYEE
         ========================== */}
 
-        {/* Employee Dashboard */}
         <Route
           path="/employee-dashboard"
           element={<EmployeeDashboard />}
         />
 
-        {/* Employee Attendance History */}
         <Route
           path="/employee-attendance"
           element={<EmployeeAttendance />}
