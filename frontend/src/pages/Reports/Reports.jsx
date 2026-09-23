@@ -55,6 +55,7 @@ function Reports() {
 
   const [analytics, setAnalytics] = useState(null);
   const [trendData, setTrendData] = useState([]);
+  const [workforceInsights, setWorkforceInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -68,14 +69,19 @@ function Reports() {
     setError("");
 
     try {
-      const [analyticsResponse, trendResponse] =
-        await Promise.all([
-          api.get("/analytics/attendance"),
-          api.get("/analytics/attendance-trend"),
-        ]);
+      const [
+        analyticsResponse,
+        trendResponse,
+        workforceResponse,
+      ] = await Promise.all([
+        api.get("/analytics/attendance"),
+        api.get("/analytics/attendance-trend"),
+        api.get("/analytics/workforce-insights"),
+      ]);
 
       setAnalytics(analyticsResponse.data);
       setTrendData(trendResponse.data);
+      setWorkforceInsights(workforceResponse.data);
 
     } catch (err) {
       console.error(err);
@@ -203,6 +209,22 @@ function Reports() {
 
     return "warning";
   };
+
+  const getWorkforceInsightSeverity = (severity) => {
+  if (severity === "warning") {
+    return "warning";
+  }
+
+  if (severity === "error") {
+    return "error";
+  }
+
+  if (severity === "success") {
+    return "success";
+  }
+
+  return "info";
+};
 
 
   // ============================================================
@@ -1132,7 +1154,95 @@ function Reports() {
 
             </Paper>
 
+{/* ================================================= */}
+{/* WORKFORCE ADAPTIVE INSIGHTS */}
+{/* ================================================= */}
 
+<Paper
+  sx={{
+    p: 3,
+    mb: 4,
+  }}
+>
+  <Box
+    display="flex"
+    alignItems="center"
+    gap={1}
+    mb={2}
+  >
+    <TrendingUpIcon color="primary" />
+
+    <Box>
+      <Typography
+        variant="h6"
+        fontWeight="bold"
+      >
+        Workforce Adaptive Insights
+      </Typography>
+
+      <Typography
+        variant="body2"
+        color="text.secondary"
+      >
+        Backend analysis of recent workforce activity
+        and historical data.
+      </Typography>
+    </Box>
+  </Box>
+
+  <Divider sx={{ mb: 2 }} />
+
+  {workforceInsights.length === 0 ? (
+    <Alert severity="info">
+      No workforce adaptive insights are available
+      for the current analysis period.
+    </Alert>
+  ) : (
+    <Box>
+      {workforceInsights.map((insight, index) => (
+<Alert
+  key={`${insight.insight_type}-${index}`}
+  severity={getWorkforceInsightSeverity(
+    insight.severity
+  )}
+  sx={{ mb: 1 }}
+>
+  <Box
+    display="flex"
+    alignItems="center"
+    justifyContent="space-between"
+    width="100%"
+    gap={2}
+  >
+    <Box>
+      <Typography
+        component="div"
+        fontWeight="bold"
+      >
+        {insight.title}
+      </Typography>
+
+      <Typography
+        component="div"
+        variant="body2"
+      >
+        {insight.message}
+      </Typography>
+    </Box>
+
+    <Typography
+      variant="h6"
+      fontWeight="bold"
+      sx={{ whiteSpace: "nowrap" }}
+    >
+      {insight.metric}
+    </Typography>
+  </Box>
+</Alert>
+      ))}
+    </Box>
+  )}
+</Paper>
             {/* ================================================= */}
             {/* EMPLOYEE ANALYTICS */}
             {/* ================================================= */}

@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from app.core.database import SessionLocal
@@ -12,8 +12,11 @@ from app.models.attendance import Attendance
 
 RIGA_TIMEZONE = ZoneInfo("Europe/Riga")
 
-# Number of previous days to generate
+# Existing recent historical period
 HISTORY_DAYS = 15
+
+# Additional older period used for adaptive comparison
+BASELINE_DAYS = 15
 
 
 # ============================================================
@@ -170,9 +173,7 @@ def main():
         print("TimeTap Attendance History Generator")
         print("=" * 60)
 
-        print(
-            f"Employees found:"
-        )
+        print("Employees found:")
 
         print(
             f"  W001: {anna.first_name} "
@@ -198,11 +199,15 @@ def main():
         created_count = 0
 
         # ====================================================
-        # GENERATE PREVIOUS 15 DAYS
+        # GENERATE RECENT + OLDER BASELINE PERIOD
         # ====================================================
 
+        total_history_days = (
+            HISTORY_DAYS + BASELINE_DAYS
+        )
+
         for days_ago in range(
-            HISTORY_DAYS,
+            total_history_days,
             0,
             -1
         ):
@@ -212,9 +217,10 @@ def main():
                 - timedelta(days=days_ago)
             )
 
+            # Repeat the existing 15-day pattern
+            # for the older baseline period.
             day_number = (
-                HISTORY_DAYS
-                - days_ago
+                ((days_ago - 1) % HISTORY_DAYS)
                 + 1
             )
 
@@ -229,7 +235,6 @@ def main():
             # Miss attendance on days 5, 10 and 14
             if day_number not in [5, 10, 14]:
 
-                # Different check-in times
                 anna_checkins = [
                     (10, 5),
                     (10, 20),
@@ -254,7 +259,7 @@ def main():
                     anna_checkins[index]
                 )
 
-                create_attendance(
+                created = create_attendance(
                     db,
                     anna,
                     work_date,
@@ -264,7 +269,8 @@ def main():
                     0,
                 )
 
-                created_count += 1
+                if created:
+                    created_count += 1
 
             # =================================================
             # EMPLOYEE W002 - TEST FLEXIBLE
@@ -302,7 +308,7 @@ def main():
                     day_number
                 ]
 
-                create_attendance(
+                created = create_attendance(
                     db,
                     flexible,
                     work_date,
@@ -312,7 +318,8 @@ def main():
                     0,
                 )
 
-                created_count += 1
+                if created:
+                    created_count += 1
 
             # =================================================
             # EMPLOYEE W003 - TEST FIXED
@@ -348,7 +355,7 @@ def main():
                 day_number
             ]
 
-            create_attendance(
+            created = create_attendance(
                 db,
                 fixed,
                 work_date,
@@ -358,23 +365,38 @@ def main():
                 0,
             )
 
-            created_count += 1
+            if created:
+                created_count += 1
 
         db.commit()
 
         print()
         print("=" * 60)
         print(
-            f"Attendance records processed: "
+            f"New attendance records created: "
             f"{created_count}"
         )
         print("=" * 60)
 
         print()
-        print("Historical attendance generated successfully.")
+        print(
+            "Historical attendance generated successfully."
+        )
         print()
-        print("Existing attendance records were NOT deleted.")
-        print("Today's Test Fixed attendance was preserved.")
+        print(
+            "Existing attendance records were NOT deleted."
+        )
+        print(
+            "Today's existing attendance was preserved."
+        )
+        print()
+        print(
+            "Recent 15-day history was preserved."
+        )
+        print(
+            "Older 15-day baseline history was added "
+            "for adaptive comparison."
+        )
         print()
 
     except Exception as error:

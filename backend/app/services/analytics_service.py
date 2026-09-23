@@ -7,865 +7,580 @@ from app.models.attendance import Attendance
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 
+from app.schemas.analytics import (
+    AnalyticsSummary,
+    EmployeeAnalytics,
+    AdaptiveAlert,
+    AttendanceTrend,
+    WorkforceInsight,
+)
 
-# ============================================================
-# TIMEZONE
-# ============================================================
 
 RIGA_TIMEZONE = ZoneInfo("Europe/Riga")
 
 
 # ============================================================
-# UTC -> RIGA
+# TIME HELPERS
 # ============================================================
 
 def to_riga_time(value):
+    """
+    Convert stored UTC-naive datetime to Europe/Riga time.
+
+    Attendance records are stored as UTC-naive timestamps
+    in SQLite.
+    """
+
     if value is None:
         return None
 
     if value.tzinfo is None:
-        value = value.replace(
-            tzinfo=timezone.utc
-        )
+        value = value.replace(tzinfo=timezone.utc)
 
-    return value.astimezone(
-        RIGA_TIMEZONE
-    )
+    return value.astimezone(RIGA_TIMEZONE)
 
-
-# ============================================================
-# NORMALIZE TIME STRING
-# ============================================================
 
 def normalize_time_string(value):
     """
-    Accept both:
+    Normalize schedule strings.
 
-        11:00
-        11.00
-
-    and normalize them to:
-
-        11:00
+    Examples:
+        11.00 -> 11:00
+        19.30 -> 19:30
     """
 
     if not value:
         return None
 
-    value = value.strip()
-
-    value = value.replace(".", ":")
-
-    return value
+    return value.strip().replace(".", ":")
 
 
-# ============================================================
-# AVERAGE TIME
-# ============================================================
+def parse_shift_time(value):
+    """
+    Convert a shift time string to a time object.
+    """
 
-def _average_time(
-    records,
-    field_name
-):
-    values = []
+    value = normalize_time_string(value)
 
-    for record in records:
+    if not value:
+        return None
 
-        value = getattr(
-            record,
-            field_name,
-            None
-        )
-
-        if value is None:
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt).time()
+        except ValueError:
             continue
 
-        local_value = to_riga_time(
-            value
-        )
+    return None
 
-        total_seconds = (
-            local_value.hour * 3600
-            + local_value.minute * 60
-            + local_value.second
-        )
 
-        values.append(
-            total_seconds
-        )
+def _average_time(values):
+    """
+    Calculate average clock time.
+    """
 
     if not values:
         return None
 
-    average_seconds = (
-        sum(values) / len(values)
-    )
+    total_seconds = 0
 
-    hours = int(
-        average_seconds // 3600
-    )
+    for value in values:
+        total_seconds += (
+            value.hour * 3600
+            + value.minute * 60
+            + value.second
+        )
 
-    minutes = int(
-        (average_seconds % 3600) // 60
-    )
+    average_seconds = total_seconds / len(values)
+
+    hours = int(average_seconds // 3600)
+    minutes = int((average_seconds % 3600) // 60)
 
     return f"{hours:02d}:{minutes:02d}"
 
 
-# ============================================================
-# LATE ARRIVAL ANALYSIS
-# ============================================================
-
-def _calculate_late_minutes(
-    employee,
-    records
-):
+def _calculate_late_minutes(employee, check_in):
     """
-    Calculate lateness for Fixed schedule employees.
-
-    Flexible employees do not have a scheduled start time,
-    therefore lateness is not calculated for them.
+    Calculate lateness only for employees with a fixed schedule.
     """
+
+    if not employee:
+        return 0
 
     if employee.schedule_type != "Fixed":
-        return 0, 0.0
+        return 0
 
-    normalized_start = normalize_time_string(
-        employee.shift_start
-    )
+    shift_start = parse_shift_time(employee.shift_start)
 
-    if not normalized_start:
-        return 0, 0.0
+    if shift_start is None:
+        return 0
 
-    try:
+    local_check_in = to_riga_time(check_in)
 
-        scheduled_time = datetime.strptime(
-            normalized_start,
-            "%H:%M"
-        ).time()
-
-    except ValueError:
-
-        return 0, 0.0
+    if local_check_in is None:
+        return 0
 
     scheduled_minutes = (
-        scheduled_time.hour * 60
-        + scheduled_time.minute
+        shift_start.hour * 60
+        + shift_start.minute
     )
 
-    late_arrivals = 0
-    late_minutes = []
-
-    for record in records:
-
-        if record.check_in is None:
-            continue
-
-        local_check_in = to_riga_time(
-            record.check_in
-        )
-
-        actual_minutes = (
-            local_check_in.hour * 60
-            + local_check_in.minute
-        )
-
-        difference = (
-            actual_minutes
-            - scheduled_minutes
-        )
-
-        if difference > 0:
-
-            late_arrivals += 1
-
-            late_minutes.append(
-                difference
-            )
-
-    if late_minutes:
-
-        average_late_minutes = round(
-            sum(late_minutes)
-            / len(late_minutes),
-            2
-        )
-
-    else:
-
-        average_late_minutes = 0.0
-
-    return (
-        late_arrivals,
-        average_late_minutes
+    actual_minutes = (
+        local_check_in.hour * 60
+        + local_check_in.minute
     )
+
+    late_minutes = actual_minutes - scheduled_minutes
+
+    return max(late_minutes, 0)
 
 
 # ============================================================
-# ADAPTIVE ALERTS
+# EMPLOYEE ALERTS
 # ============================================================
 
 def _generate_employee_alerts(
     employee,
-    employee_result
+    days_present,
+    attendance_rate,
+    average_shift_hours,
+    late_arrivals,
+    average_late_minutes,
+    average_check_in,
 ):
+    """
+    Generate adaptive employee-level alerts.
+    """
 
     alerts = []
 
-    employee_name = (
-        f"{employee.first_name} "
-        f"{employee.last_name}"
-    )
-
-    employee_id = employee.employee_id
-
-    attendance_rate = (
-        employee_result[
-            "attendance_rate"
-        ]
-    )
-
-    average_shift_hours = (
-        employee_result[
-            "average_shift_hours"
-        ]
-    )
-
-    late_arrivals = (
-        employee_result[
-            "late_arrivals"
-        ]
-    )
-
-    average_late_minutes = (
-        employee_result[
-            "average_late_minutes"
-        ]
-    )
-
-    days_present = (
-        employee_result[
-            "days_present"
-        ]
-    )
-
-    average_check_in = (
-        employee_result[
-            "average_check_in"
-        ]
-    )
-
-    # ========================================================
+    # --------------------------------------------------------
     # LOW ATTENDANCE
-    # ========================================================
+    # --------------------------------------------------------
 
     if attendance_rate < 50:
-
         alerts.append(
-            {
-                "employee_id":
-                    employee_id,
-
-                "employee_name":
-                    employee_name,
-
-                "alert_type":
-                    "Low Attendance",
-
-                "severity":
-                    "error",
-
-                "message":
-                    (
-                        f"{employee_name} has an "
-                        f"attendance rate of "
-                        f"{attendance_rate}%, which "
-                        f"is below the 50% threshold."
-                    ),
-            }
+            AdaptiveAlert(
+                employee_id=employee.employee_id,
+                employee_name=(
+                    f"{employee.first_name} "
+                    f"{employee.last_name}"
+                ),
+                alert_type="Low Attendance",
+                severity="error",
+                message=(
+                    f"Attendance rate is {attendance_rate:.1f}%. "
+                    "This is below the 50% monitoring threshold."
+                ),
+            )
         )
 
-    # ========================================================
+    # --------------------------------------------------------
     # REPEATED LATENESS
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         employee.schedule_type == "Fixed"
         and late_arrivals >= 2
     ):
-
         alerts.append(
-            {
-                "employee_id":
-                    employee_id,
-
-                "employee_name":
-                    employee_name,
-
-                "alert_type":
-                    "Repeated Lateness",
-
-                "severity":
-                    "warning",
-
-                "message":
-                    (
-                        f"{employee_name} has recorded "
-                        f"{late_arrivals} late arrivals, "
-                        f"with an average lateness of "
-                        f"{average_late_minutes} minutes."
-                    ),
-            }
+            AdaptiveAlert(
+                employee_id=employee.employee_id,
+                employee_name=(
+                    f"{employee.first_name} "
+                    f"{employee.last_name}"
+                ),
+                alert_type="Repeated Lateness",
+                severity="warning",
+                message=(
+                    f"{late_arrivals} late arrivals detected. "
+                    f"Average lateness is "
+                    f"{average_late_minutes:.1f} minutes."
+                ),
+            )
         )
 
-    # ========================================================
+    # --------------------------------------------------------
     # SHORT SHIFTS
-    # ========================================================
+    # --------------------------------------------------------
 
     if (
         days_present >= 2
-        and average_shift_hours > 0
         and average_shift_hours < 4
     ):
-
         alerts.append(
-            {
-                "employee_id":
-                    employee_id,
-
-                "employee_name":
-                    employee_name,
-
-                "alert_type":
-                    "Short Shifts",
-
-                "severity":
-                    "warning",
-
-                "message":
-                    (
-                        f"{employee_name} has an "
-                        f"average completed shift "
-                        f"of {average_shift_hours} "
-                        f"hours."
-                    ),
-            }
+            AdaptiveAlert(
+                employee_id=employee.employee_id,
+                employee_name=(
+                    f"{employee.first_name} "
+                    f"{employee.last_name}"
+                ),
+                alert_type="Short Shifts",
+                severity="warning",
+                message=(
+                    f"Average shift duration is "
+                    f"{average_shift_hours:.2f} hours."
+                ),
+            )
         )
 
-    # ========================================================
-    # FLEXIBLE PATTERN
-    # ========================================================
+    # --------------------------------------------------------
+    # FLEXIBLE ATTENDANCE PATTERN
+    # --------------------------------------------------------
 
     if (
         employee.schedule_type == "Flexible"
         and days_present >= 2
         and average_check_in
     ):
-
         alerts.append(
-            {
-                "employee_id":
-                    employee_id,
-
-                "employee_name":
-                    employee_name,
-
-                "alert_type":
-                    "Attendance Pattern",
-
-                "severity":
-                    "info",
-
-                "message":
-                    (
-                        f"{employee_name} has an "
-                        f"observed average check-in "
-                        f"time of {average_check_in} "
-                        f"based on historical attendance."
-                    ),
-            }
+            AdaptiveAlert(
+                employee_id=employee.employee_id,
+                employee_name=(
+                    f"{employee.first_name} "
+                    f"{employee.last_name}"
+                ),
+                alert_type="Attendance Pattern",
+                severity="info",
+                message=(
+                    f"Flexible schedule employee has an "
+                    f"average check-in time of "
+                    f"{average_check_in}."
+                ),
+            )
         )
 
     return alerts
 
 
 # ============================================================
-# MAIN ANALYTICS
+# ATTENDANCE ANALYTICS
 # ============================================================
 
 def get_attendance_analytics(
     db: Session,
-    days: int = 30
+    days: int = 30,
 ):
+    """
+    Generate employee attendance analytics for
+    the requested number of previous days.
+    """
 
-    # ========================================================
-    # CURRENT RIGA DATE
-    # ========================================================
-
-    now_riga = datetime.now(
+    current_date = datetime.now(
         RIGA_TIMEZONE
+    ).date()
+
+    start_date = current_date - timedelta(
+        days=days - 1
     )
-
-    today = now_riga.date()
-
-    start_date = (
-        today
-        - timedelta(days=days - 1)
-    )
-
-    # ========================================================
-    # EMPLOYEES
-    # ========================================================
 
     employees = (
         db.query(Employee)
         .filter(
             Employee.is_active == True,
-            Employee.role != "Manager"
+            Employee.role != "Manager",
         )
         .all()
     )
-
-    # ========================================================
-    # ATTENDANCE
-    # ========================================================
 
     attendance_records = (
         db.query(Attendance)
         .filter(
             Attendance.work_date >= start_date,
-            Attendance.work_date <= today
+            Attendance.work_date <= current_date,
         )
         .all()
     )
+
+    attendance_by_employee = {}
+
+    for record in attendance_records:
+        attendance_by_employee.setdefault(
+            record.employee_id,
+            []
+        ).append(record)
+
+    employee_analytics = []
+    all_alerts = []
 
     total_attendance_records = len(
         attendance_records
     )
 
-    total_worked_minutes = 0
+    total_worked_minutes = sum(
+        record.worked_minutes or 0
+        for record in attendance_records
+    )
 
     employees_with_attendance = 0
 
-    employees_with_low_attendance = 0
-
-    employee_results = []
-
-    adaptive_alerts = []
-
-    # ========================================================
-    # PROCESS EMPLOYEES
-    # ========================================================
-
     for employee in employees:
 
-        employee_records = [
-            record
-            for record in attendance_records
-            if record.employee_id == employee.id
-        ]
-
-        # ----------------------------------------------------
-        # DAYS PRESENT
-        # ----------------------------------------------------
-
-        days_present = len(
-            employee_records
+        records = attendance_by_employee.get(
+            employee.id,
+            []
         )
 
-        if days_present > 0:
+        if records:
             employees_with_attendance += 1
 
-        # ----------------------------------------------------
-        # WORKED TIME
-        # ----------------------------------------------------
+        days_present = len(records)
 
-        employee_worked_minutes = sum(
+        worked_minutes = sum(
             record.worked_minutes or 0
-            for record in employee_records
+            for record in records
         )
 
-        employee_worked_hours = round(
-            employee_worked_minutes / 60,
-            2
+        worked_hours = worked_minutes / 60
+
+        average_shift_hours = (
+            worked_hours / days_present
+            if days_present > 0
+            else 0
         )
 
-        total_worked_minutes += (
-            employee_worked_minutes
+        attendance_rate = (
+            (days_present / days) * 100
+            if days > 0
+            else 0
         )
 
-        # ----------------------------------------------------
-        # COMPLETED SHIFTS
-        # ----------------------------------------------------
+        attendance_rate = min(
+            max(attendance_rate, 0),
+            100
+        )
 
-        completed_records = [
-            record
-            for record in employee_records
-            if record.check_in is not None
-            and record.check_out is not None
-        ]
+        check_in_times = []
+        check_out_times = []
 
-        if completed_records:
+        late_arrivals = 0
+        total_late_minutes = 0
 
-            completed_shift_hours = [
-                (
-                    record.worked_minutes or 0
-                ) / 60
-                for record in completed_records
-            ]
+        for record in records:
 
-            average_shift_hours = round(
-                sum(completed_shift_hours)
-                / len(completed_shift_hours),
-                2
+            local_check_in = to_riga_time(
+                record.check_in
             )
 
-        else:
-
-            average_shift_hours = 0.0
-
-        # ----------------------------------------------------
-        # ATTENDANCE RATE
-        #
-        # IMPORTANT:
-        # Use the actual analysis period as denominator.
-        # This guarantees the result cannot exceed 100%.
-        # ----------------------------------------------------
-
-        analysis_days = days
-
-        if analysis_days > 0:
-
-            attendance_rate = round(
-                (
-                    days_present
-                    / analysis_days
-                ) * 100,
-                2
+            local_check_out = to_riga_time(
+                record.check_out
             )
 
-        else:
+            if local_check_in:
+                check_in_times.append(
+                    local_check_in.time()
+                )
 
-            attendance_rate = 0.0
+            if local_check_out:
+                check_out_times.append(
+                    local_check_out.time()
+                )
 
-        # Safety limit
-
-        attendance_rate = max(
-            0.0,
-            min(
-                attendance_rate,
-                100.0
+            late_minutes = _calculate_late_minutes(
+                employee,
+                record.check_in,
             )
-        )
 
-        # ----------------------------------------------------
-        # LOW ATTENDANCE
-        # ----------------------------------------------------
-
-        if attendance_rate < 50:
-
-            employees_with_low_attendance += 1
-
-        # ----------------------------------------------------
-        # AVERAGE CHECK-IN
-        # ----------------------------------------------------
+            if late_minutes > 0:
+                late_arrivals += 1
+                total_late_minutes += late_minutes
 
         average_check_in = _average_time(
-            employee_records,
-            "check_in"
+            check_in_times
         )
-
-        # ----------------------------------------------------
-        # AVERAGE CHECK-OUT
-        # ----------------------------------------------------
 
         average_check_out = _average_time(
-            employee_records,
-            "check_out"
+            check_out_times
         )
 
-        # ----------------------------------------------------
-        # LATE ARRIVALS
-        # ----------------------------------------------------
-
-        (
-            late_arrivals,
-            average_late_minutes
-        ) = _calculate_late_minutes(
-            employee,
-            employee_records
+        average_late_minutes = (
+            total_late_minutes / late_arrivals
+            if late_arrivals > 0
+            else 0
         )
 
-        # ----------------------------------------------------
-        # RESTAURANT
-        # ----------------------------------------------------
-
-        restaurant = None
+        restaurant_name = "Not assigned"
 
         if employee.restaurant_id:
 
             restaurant = (
                 db.query(Restaurant)
                 .filter(
-                    Restaurant.id
-                    == employee.restaurant_id
+                    Restaurant.id == employee.restaurant_id
                 )
                 .first()
             )
 
-        restaurant_name = (
-            restaurant.name
-            if restaurant
-            else "Unassigned"
+            if restaurant:
+                restaurant_name = restaurant.name
+
+        alerts = _generate_employee_alerts(
+            employee=employee,
+            days_present=days_present,
+            attendance_rate=attendance_rate,
+            average_shift_hours=average_shift_hours,
+            late_arrivals=late_arrivals,
+            average_late_minutes=average_late_minutes,
+            average_check_in=average_check_in,
         )
 
-        # ----------------------------------------------------
-        # EMPLOYEE RESULT
-        # ----------------------------------------------------
+        all_alerts.extend(alerts)
 
-        employee_result = {
+        employee_analytics.append(
+            EmployeeAnalytics(
+                employee_id=employee.employee_id,
+                first_name=employee.first_name,
+                last_name=employee.last_name,
+                role=employee.role,
+                restaurant=restaurant_name,
 
-            "employee_id":
-                employee.employee_id,
-
-            "first_name":
-                employee.first_name,
-
-            "last_name":
-                employee.last_name,
-
-            "role":
-                employee.role,
-
-            "restaurant":
-                restaurant_name,
-
-            "schedule_type":
-                employee.schedule_type,
-
-            "shift_start":
-                normalize_time_string(
-                    employee.shift_start
+                schedule_type=(
+                    employee.schedule_type
+                    or "Flexible"
                 ),
 
-            "shift_end":
-                normalize_time_string(
-                    employee.shift_end
+                shift_start=employee.shift_start,
+                shift_end=employee.shift_end,
+
+                days_present=days_present,
+
+                total_worked_minutes=worked_minutes,
+
+                total_worked_hours=round(
+                    worked_hours,
+                    2,
                 ),
 
-            "days_present":
-                days_present,
+                average_shift_hours=round(
+                    average_shift_hours,
+                    2,
+                ),
 
-            "total_worked_minutes":
-                employee_worked_minutes,
+                attendance_rate=round(
+                    attendance_rate,
+                    2,
+                ),
 
-            "total_worked_hours":
-                employee_worked_hours,
+                average_check_in=average_check_in,
+                average_check_out=average_check_out,
 
-            "average_shift_hours":
-                average_shift_hours,
+                late_arrivals=late_arrivals,
 
-            "attendance_rate":
-                attendance_rate,
-
-            "average_check_in":
-                average_check_in,
-
-            "average_check_out":
-                average_check_out,
-
-            "late_arrivals":
-                late_arrivals,
-
-            "average_late_minutes":
-                average_late_minutes,
-        }
-
-        employee_results.append(
-            employee_result
-        )
-
-        # ----------------------------------------------------
-        # ADAPTIVE ALERTS
-        # ----------------------------------------------------
-
-        employee_alerts = (
-            _generate_employee_alerts(
-                employee,
-                employee_result
+                average_late_minutes=round(
+                    average_late_minutes,
+                    2,
+                ),
             )
         )
 
-        adaptive_alerts.extend(
-            employee_alerts
-        )
-
-    # ========================================================
-    # TOTAL WORKED HOURS
-    # ========================================================
-
-    total_worked_hours = round(
-        total_worked_minutes / 60,
-        2
+    total_worked_hours = (
+        total_worked_minutes / 60
     )
 
-    # ========================================================
-    # AVERAGE SHIFT
-    # ========================================================
+    average_shift_hours = (
+        total_worked_hours / total_attendance_records
+        if total_attendance_records > 0
+        else 0
+    )
 
-    completed_employee_shifts = [
-        employee["average_shift_hours"]
-        for employee in employee_results
-        if employee["average_shift_hours"] > 0
-    ]
-
-    if completed_employee_shifts:
-
-        average_shift_hours = round(
-            sum(completed_employee_shifts)
-            / len(completed_employee_shifts),
-            2
+    average_attendance_rate = (
+        sum(
+            employee.attendance_rate
+            for employee in employee_analytics
         )
+        / len(employee_analytics)
+        if employee_analytics
+        else 0
+    )
 
-    else:
+    employees_with_low_attendance = sum(
+        1
+        for employee in employee_analytics
+        if employee.attendance_rate < 50
+    )
 
-        average_shift_hours = 0.0
+    return AnalyticsSummary(
+        total_employees=len(employees),
 
-    # ========================================================
-    # AVERAGE ATTENDANCE
-    # ========================================================
+        employees_with_attendance=(
+            employees_with_attendance
+        ),
 
-    if employee_results:
+        total_attendance_records=(
+            total_attendance_records
+        ),
 
-        average_attendance_rate = round(
-            sum(
-                employee["attendance_rate"]
-                for employee in employee_results
-            )
-            / len(employee_results),
-            2
-        )
+        total_worked_minutes=(
+            total_worked_minutes
+        ),
 
-    else:
-
-        average_attendance_rate = 0.0
-
-    # ========================================================
-    # FINAL RESULT
-    # ========================================================
-
-    return {
-
-        "total_employees":
-            len(employees),
-
-        "employees_with_attendance":
-            employees_with_attendance,
-
-        "total_attendance_records":
-            total_attendance_records,
-
-        "total_worked_minutes":
-            total_worked_minutes,
-
-        "total_worked_hours":
+        total_worked_hours=round(
             total_worked_hours,
+            2,
+        ),
 
-        "average_shift_hours":
+        average_shift_hours=round(
             average_shift_hours,
+            2,
+        ),
 
-        "average_attendance_rate":
+        average_attendance_rate=round(
             average_attendance_rate,
+            2,
+        ),
 
-        "employees_with_low_attendance":
-            employees_with_low_attendance,
+        employees_with_low_attendance=(
+            employees_with_low_attendance
+        ),
 
-        "employees":
-            employee_results,
+        employees=employee_analytics,
 
-        "alerts":
-            adaptive_alerts,
-    }
+        alerts=all_alerts,
+    )
+
 
 # ============================================================
-# DAILY ATTENDANCE TREND
+# ATTENDANCE TREND
 # ============================================================
 
 def get_attendance_trend(
     db: Session,
-    days: int = 30
+    days: int = 30,
 ):
     """
-    Process attendance history day by day.
-
-    Returns:
-    - attendance count
-    - total worked hours
-    - average worked hours
-    - late arrivals
-
-    for each day in the selected period.
+    Generate daily attendance trends.
     """
 
-    now_riga = datetime.now(
+    current_date = datetime.now(
         RIGA_TIMEZONE
+    ).date()
+
+    start_date = current_date - timedelta(
+        days=days - 1
     )
 
-    today = now_riga.date()
-
-    start_date = (
-        today
-        - timedelta(days=days - 1)
-    )
-
-    # --------------------------------------------------------
-    # Get attendance records
-    # --------------------------------------------------------
-
-    records = (
+    attendance_records = (
         db.query(Attendance)
         .filter(
             Attendance.work_date >= start_date,
-            Attendance.work_date <= today
+            Attendance.work_date <= current_date,
         )
         .all()
     )
-
-    # --------------------------------------------------------
-    # Get employees
-    # --------------------------------------------------------
-
-    employees = (
-        db.query(Employee)
-        .filter(
-            Employee.is_active == True,
-            Employee.role != "Manager"
-        )
-        .all()
-    )
-
-    employee_map = {
-        employee.id: employee
-        for employee in employees
-    }
 
     trends = []
 
-    # --------------------------------------------------------
-    # Process each day
-    # --------------------------------------------------------
-
     for day_offset in range(days):
 
-        current_date = (
+        trend_date = (
             start_date
             + timedelta(days=day_offset)
         )
 
         daily_records = [
             record
-            for record in records
-            if record.work_date == current_date
+            for record in attendance_records
+            if record.work_date == trend_date
         ]
 
         attendance_count = len(
@@ -877,66 +592,520 @@ def get_attendance_trend(
             for record in daily_records
         )
 
-        total_worked_hours = round(
-            total_worked_minutes / 60,
-            2
+        total_worked_hours = (
+            total_worked_minutes / 60
         )
 
-        if attendance_count > 0:
-
-            average_worked_hours = round(
-                total_worked_hours
-                / attendance_count,
-                2
-            )
-
-        else:
-
-            average_worked_hours = 0.0
-
-        # ----------------------------------------------------
-        # Calculate daily late arrivals
-        # ----------------------------------------------------
+        average_worked_hours = (
+            total_worked_hours / attendance_count
+            if attendance_count > 0
+            else 0
+        )
 
         daily_late_arrivals = 0
 
         for record in daily_records:
 
-            employee = employee_map.get(
-                record.employee_id
-            )
-
-            if employee is None:
-                continue
-
-            late_count, _ = (
-                _calculate_late_minutes(
-                    employee,
-                    [record]
+            employee = (
+                db.query(Employee)
+                .filter(
+                    Employee.id == record.employee_id
                 )
+                .first()
             )
 
-            daily_late_arrivals += (
-                late_count
-            )
+            if employee:
+
+                late_minutes = (
+                    _calculate_late_minutes(
+                        employee,
+                        record.check_in,
+                    )
+                )
+
+                if late_minutes > 0:
+                    daily_late_arrivals += 1
 
         trends.append(
-            {
-                "date":
-                    current_date.isoformat(),
+            AttendanceTrend(
+                date=trend_date.isoformat(),
 
-                "attendance_count":
-                    attendance_count,
+                attendance_count=(
+                    attendance_count
+                ),
 
-                "total_worked_hours":
+                total_worked_hours=round(
                     total_worked_hours,
+                    2,
+                ),
 
-                "average_worked_hours":
+                average_worked_hours=round(
                     average_worked_hours,
+                    2,
+                ),
 
-                "late_arrivals":
-                    daily_late_arrivals,
-            }
+                late_arrivals=(
+                    daily_late_arrivals
+                ),
+            )
         )
 
     return trends
+
+
+# ============================================================
+# WORKFORCE ADAPTIVE INSIGHTS
+# ============================================================
+
+def get_workforce_insights(
+    db: Session,
+    days: int = 14,
+):
+    """
+    Compare recent workforce activity against
+    the previous period.
+
+    Percentage comparisons are only generated when
+    the previous period has enough baseline data.
+    """
+
+    current_date = datetime.now(
+        RIGA_TIMEZONE
+    ).date()
+
+    # --------------------------------------------------------
+    # PERIOD DEFINITIONS
+    # --------------------------------------------------------
+
+    recent_start = (
+        current_date
+        - timedelta(days=days - 1)
+    )
+
+    previous_end = (
+        recent_start
+        - timedelta(days=1)
+    )
+
+    previous_start = (
+        previous_end
+        - timedelta(days=days - 1)
+    )
+
+    # --------------------------------------------------------
+    # GET RECENT RECORDS
+    # --------------------------------------------------------
+
+    recent_records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.work_date >= recent_start,
+            Attendance.work_date <= current_date,
+        )
+        .all()
+    )
+
+    # --------------------------------------------------------
+    # GET PREVIOUS RECORDS
+    # --------------------------------------------------------
+
+    previous_records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.work_date >= previous_start,
+            Attendance.work_date <= previous_end,
+        )
+        .all()
+    )
+
+    # --------------------------------------------------------
+    # RECENT ATTENDANCE
+    # --------------------------------------------------------
+
+    recent_attendance = len(
+        recent_records
+    )
+
+    # --------------------------------------------------------
+    # RECENT WORKED HOURS
+    # --------------------------------------------------------
+
+    recent_worked_hours = (
+        sum(
+            record.worked_minutes or 0
+            for record in recent_records
+        )
+        / 60
+    )
+
+    # --------------------------------------------------------
+    # RECENT LATENESS
+    # --------------------------------------------------------
+
+    recent_late_arrivals = 0
+
+    for record in recent_records:
+
+        employee = (
+            db.query(Employee)
+            .filter(
+                Employee.id == record.employee_id
+            )
+            .first()
+        )
+
+        if employee:
+
+            late_minutes = (
+                _calculate_late_minutes(
+                    employee,
+                    record.check_in,
+                )
+            )
+
+            if late_minutes > 0:
+                recent_late_arrivals += 1
+
+    # --------------------------------------------------------
+    # PREVIOUS ATTENDANCE
+    # --------------------------------------------------------
+
+    previous_attendance = len(
+        previous_records
+    )
+
+    # --------------------------------------------------------
+    # PREVIOUS WORKED HOURS
+    # --------------------------------------------------------
+
+    previous_worked_hours = (
+        sum(
+            record.worked_minutes or 0
+            for record in previous_records
+        )
+        / 60
+    )
+
+    # --------------------------------------------------------
+    # PREVIOUS LATENESS
+    # --------------------------------------------------------
+
+    previous_late_arrivals = 0
+
+    for record in previous_records:
+
+        employee = (
+            db.query(Employee)
+            .filter(
+                Employee.id == record.employee_id
+            )
+            .first()
+        )
+
+        if employee:
+
+            late_minutes = (
+                _calculate_late_minutes(
+                    employee,
+                    record.check_in,
+                )
+            )
+
+            if late_minutes > 0:
+                previous_late_arrivals += 1
+
+    insights = []
+
+    # ========================================================
+    # ATTENDANCE COMPARISON
+    # ========================================================
+
+    # Require more than 5 previous attendance records.
+    #
+    # This prevents very small historical datasets from
+    # producing misleading percentage changes.
+
+    if previous_attendance <= 5:
+
+        insights.append(
+            WorkforceInsight(
+                insight_type="Attendance Baseline",
+                severity="info",
+                title="Attendance baseline is limited",
+                message=(
+                    f"{recent_attendance} attendance records "
+                    f"were recorded during the recent "
+                    f"{days}-day period. "
+                    "The previous period has too little "
+                    "attendance data for a reliable "
+                    "percentage comparison."
+                ),
+                metric=float(
+                    recent_attendance
+                ),
+            )
+        )
+
+    else:
+
+        recent_daily_average = (
+            recent_attendance / days
+        )
+
+        previous_daily_average = (
+            previous_attendance / days
+        )
+
+        if previous_daily_average > 0:
+
+            attendance_change = (
+                (
+                    recent_daily_average
+                    - previous_daily_average
+                )
+                / previous_daily_average
+            ) * 100
+
+            if abs(attendance_change) >= 0:
+
+                if attendance_change > 0:
+
+                    insights.append(
+                        WorkforceInsight(
+                            insight_type=(
+                                "Attendance Increase"
+                            ),
+                            severity="info",
+                            title=(
+                                "Attendance activity increased"
+                            ),
+                            message=(
+                                "Daily attendance activity "
+                                f"increased by "
+                                f"{attendance_change:.2f}% "
+                                "compared with the previous "
+                                f"{days}-day period."
+                            ),
+                            metric=round(
+                                attendance_change,
+                                2,
+                            ),
+                        )
+                    )
+
+                else:
+
+                    insights.append(
+                        WorkforceInsight(
+                            insight_type=(
+                                "Attendance Decrease"
+                            ),
+                            severity="warning",
+                            title=(
+                                "Attendance activity decreased"
+                            ),
+                            message=(
+                                "Daily attendance activity "
+                                f"decreased by "
+                                f"{abs(attendance_change):.2f}% "
+                                "compared with the previous "
+                                f"{days}-day period."
+                            ),
+                            metric=round(
+                                attendance_change,
+                                2,
+                            ),
+                        )
+                    )
+
+    # ========================================================
+    # WORKED HOURS COMPARISON
+    # ========================================================
+
+    # Require at least 20 previous worked hours.
+    #
+    # This prevents a small historical baseline from producing
+    # extremely large and misleading percentage changes.
+
+    if previous_attendance <= 5 or previous_worked_hours < 20:
+
+        insights.append(
+            WorkforceInsight(
+                insight_type="Worked Hours Baseline",
+                severity="info",
+                title="Worked-hours baseline is limited",
+                message=(
+                    f"{recent_worked_hours:.2f} worked hours "
+                    "were recorded during the recent "
+                    f"{days}-day period. "
+                    "The previous period has too little "
+                    "worked-hours data for a reliable "
+                    "percentage comparison."
+                ),
+                metric=round(
+                    recent_worked_hours,
+                    2,
+                ),
+            )
+        )
+
+    else:
+
+        recent_daily_hours = (
+            recent_worked_hours / days
+        )
+
+        previous_daily_hours = (
+            previous_worked_hours / days
+        )
+
+        if previous_daily_hours > 0:
+
+            worked_hours_change = (
+                (
+                    recent_daily_hours
+                    - previous_daily_hours
+                )
+                / previous_daily_hours
+            ) * 100
+
+            if abs(worked_hours_change) >= 20:
+
+                if worked_hours_change > 0:
+
+                    insights.append(
+                        WorkforceInsight(
+                            insight_type=(
+                                "Worked Hours Increase"
+                            ),
+                            severity="info",
+                            title=(
+                                "Worked hours increased"
+                            ),
+                            message=(
+                                "Daily worked hours "
+                                f"increased by "
+                                f"{worked_hours_change:.2f}% "
+                                "compared with the previous "
+                                "period."
+                            ),
+                            metric=round(
+                                worked_hours_change,
+                                2,
+                            ),
+                        )
+                    )
+
+                else:
+
+                    insights.append(
+                        WorkforceInsight(
+                            insight_type=(
+                                "Worked Hours Decrease"
+                            ),
+                            severity="warning",
+                            title=(
+                                "Worked hours decreased"
+                            ),
+                            message=(
+                                "Daily worked hours "
+                                f"decreased by "
+                                f"{abs(worked_hours_change):.2f}% "
+                                "compared with the previous "
+                                "period."
+                            ),
+                            metric=round(
+                                worked_hours_change,
+                                2,
+                            ),
+                        )
+                    )
+
+    # ========================================================
+    # LATENESS COMPARISON
+    # ========================================================
+
+    # Require at least 2 previous late arrivals.
+    #
+    # If there is no meaningful previous baseline, report the
+    # recent late arrivals without calculating a percentage.
+
+    if previous_late_arrivals < 2:
+
+        if recent_late_arrivals > 0:
+
+            insights.append(
+                WorkforceInsight(
+                    insight_type="Lateness Baseline",
+                    severity="warning",
+                    title="Late arrivals detected",
+                    message=(
+                        f"{recent_late_arrivals} late arrivals "
+                        f"were recorded during the recent "
+                        f"{days}-day period. "
+                        "The previous period has no "
+                        "late-arrival baseline."
+                    ),
+                    metric=float(
+                        recent_late_arrivals
+                    ),
+                )
+            )
+
+    else:
+
+        lateness_change = (
+            (
+                recent_late_arrivals
+                - previous_late_arrivals
+            )
+            / previous_late_arrivals
+        ) * 100
+
+        if abs(lateness_change) >= 20:
+
+            if lateness_change > 0:
+
+                insights.append(
+                    WorkforceInsight(
+                        insight_type=(
+                            "Lateness Increase"
+                        ),
+                        severity="warning",
+                        title="Late arrivals increased",
+                        message=(
+                            "Late arrivals increased by "
+                            f"{lateness_change:.2f}% "
+                            "compared with the previous "
+                            "period."
+                        ),
+                        metric=round(
+                            lateness_change,
+                            2,
+                        ),
+                    )
+                )
+
+            else:
+
+                insights.append(
+                    WorkforceInsight(
+                        insight_type=(
+                            "Lateness Decrease"
+                        ),
+                        severity="info",
+                        title="Late arrivals decreased",
+                        message=(
+                            "Late arrivals decreased by "
+                            f"{abs(lateness_change):.2f}% "
+                            "compared with the previous "
+                            "period."
+                        ),
+                        metric=round(
+                            lateness_change,
+                            2,
+                        ),
+                    )
+                )
+
+    return insights

@@ -57,3 +57,11 @@ class AttendanceTrend(BaseModel):
     total_worked_hours: float
     average_worked_hours: float
     late_arrivals: int
+
+
+class WorkforceInsight(BaseModel):
+    insight_type: str
+    severity: str
+    title: str
+    message: str
+    metric: float

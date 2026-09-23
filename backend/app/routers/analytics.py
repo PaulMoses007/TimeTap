@@ -6,19 +6,17 @@ from app.core.database import SessionLocal
 from app.schemas.analytics import (
     AnalyticsSummary,
     AttendanceTrend,
+    WorkforceInsight,
 )
 
 from app.services.analytics_service import (
     get_attendance_analytics,
     get_attendance_trend,
+    get_workforce_insights,
 )
 
 from app.security.roles import require_manager
 
-
-# ============================================================
-# ANALYTICS ROUTER
-# ============================================================
 
 router = APIRouter(
     prefix="/analytics",
@@ -26,16 +24,11 @@ router = APIRouter(
 )
 
 
-# ============================================================
-# DATABASE
-# ============================================================
-
 def get_db():
     db = SessionLocal()
 
     try:
         yield db
-
     finally:
         db.close()
 
@@ -52,12 +45,6 @@ def attendance_analytics(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
-    """
-    Process attendance data from the last 30 days.
-
-    Only managers can access analytics.
-    """
-
     return get_attendance_analytics(
         db,
         days=30
@@ -65,7 +52,7 @@ def attendance_analytics(
 
 
 # ============================================================
-# DAILY ATTENDANCE TREND
+# ATTENDANCE TREND
 # ============================================================
 
 @router.get(
@@ -76,19 +63,25 @@ def attendance_trend(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
-    """
-    Process attendance history day by day.
-
-    Returns daily:
-    - attendance count
-    - total worked hours
-    - average worked hours
-    - late arrivals
-
-    Only managers can access attendance trends.
-    """
-
     return get_attendance_trend(
         db,
         days=30
+    )
+
+
+# ============================================================
+# ADAPTIVE WORKFORCE INSIGHTS
+# ============================================================
+
+@router.get(
+    "/workforce-insights",
+    response_model=list[WorkforceInsight]
+)
+def workforce_insights(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    return get_workforce_insights(
+        db,
+        days=14
     )
