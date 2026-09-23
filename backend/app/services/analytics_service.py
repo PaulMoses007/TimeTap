@@ -866,7 +866,7 @@ def get_workforce_insights(
                 / previous_daily_average
             ) * 100
 
-            if abs(attendance_change) >= 0:
+            if abs(attendance_change) >= 5:
 
                 if attendance_change > 0:
 
