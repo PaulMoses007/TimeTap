@@ -918,6 +918,21 @@ def get_workforce_insights(
                         )
                     )
 
+            else:
+                insights.append(
+                    WorkforceInsight(
+                        insight_type="Attendance Stable",
+                        severity="info",
+                        title="Attendance activity is stable",
+                        message=(
+                            "Daily attendance activity changed by only "
+                            f"{abs(attendance_change):.2f}% compared with the "
+                            f"previous {days}-day period."
+                        ),
+                        metric=round(attendance_change, 2),
+                    )
+                )
+
     # ========================================================
     # WORKED HOURS COMPARISON
     # ========================================================
