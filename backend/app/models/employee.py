@@ -51,13 +51,44 @@ class Employee(Base):
         nullable=False
     )
 
-    # Version 2.0
+    # --------------------------------------------------
     # Restaurant Assignment
+    # --------------------------------------------------
+
     restaurant_id = Column(
         Integer,
         ForeignKey("restaurants.id"),
         nullable=True
     )
+
+    # --------------------------------------------------
+    # Employee Schedule
+    # --------------------------------------------------
+
+    # Flexible or Fixed
+    schedule_type = Column(
+        String,
+        default="Flexible",
+        nullable=False
+    )
+
+    # Used only when schedule_type = "Fixed"
+    # Example: "11:00"
+    shift_start = Column(
+        String,
+        nullable=True
+    )
+
+    # Used only when schedule_type = "Fixed"
+    # Example: "19:00"
+    shift_end = Column(
+        String,
+        nullable=True
+    )
+
+    # --------------------------------------------------
+    # Approval
+    # --------------------------------------------------
 
     # Pending / Approved / Rejected
     approval_status = Column(
@@ -78,7 +109,10 @@ class Employee(Base):
         nullable=True
     )
 
-    # Password
+    # --------------------------------------------------
+    # Authentication
+    # --------------------------------------------------
+
     password_hash = Column(
         String,
         nullable=True
@@ -102,13 +136,15 @@ class Employee(Base):
         nullable=True
     )
 
-    # Created Time
+    # --------------------------------------------------
+    # Timestamps
+    # --------------------------------------------------
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
     )
 
-    # Updated Time
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,

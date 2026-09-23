@@ -15,6 +15,7 @@ from app.utils.employee_code import generate_employee_code
 from app.security.dependencies import get_current_user
 from app.security.roles import require_manager
 
+
 router = APIRouter(
     prefix="/employees",
     tags=["Employees"]
@@ -29,20 +30,38 @@ def get_db():
         db.close()
 
 
-@router.post("/", response_model=EmployeeResponse)
+# --------------------------------------------------
+# Create Employee
+# --------------------------------------------------
+
+@router.post(
+    "/",
+    response_model=EmployeeResponse
+)
 def create_employee(
     employee: EmployeeCreate,
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     new_employee = Employee(
-        employee_id=generate_employee_code(employee.role, db),
+        employee_id=generate_employee_code(
+            employee.role,
+            db
+        ),
+
         first_name=employee.first_name,
         last_name=employee.last_name,
         email=employee.email,
         phone=employee.phone,
         role=employee.role,
-        password_hash=hash_password(employee.password),
+
+        password_hash=hash_password(
+            employee.password
+        ),
+
+        shift_start=employee.shift_start,
+        shift_end=employee.shift_end,
     )
 
     db.add(new_employee)
@@ -52,7 +71,14 @@ def create_employee(
     return new_employee
 
 
-@router.get("/", response_model=list[EmployeeResponse])
+# --------------------------------------------------
+# Get All Employees
+# --------------------------------------------------
+
+@router.get(
+    "/",
+    response_model=list[EmployeeResponse]
+)
 def get_all_employees(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -60,30 +86,47 @@ def get_all_employees(
     return db.query(Employee).all()
 
 
-@router.get("/pending", response_model=list[EmployeeResponse])
+# --------------------------------------------------
+# Get Pending Employees
+# --------------------------------------------------
+
+@router.get(
+    "/pending",
+    response_model=list[EmployeeResponse]
+)
 def get_pending_employees(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     return (
         db.query(Employee)
-        .filter(Employee.approval_status == "Pending")
+        .filter(
+            Employee.approval_status == "Pending"
+        )
         .all()
     )
 
 
-# -----------------------------
-# NEW: Approve Employee
-# -----------------------------
-@router.put("/{employee_id}/approve", response_model=EmployeeResponse)
+# --------------------------------------------------
+# Approve Employee
+# --------------------------------------------------
+
+@router.put(
+    "/{employee_id}/approve",
+    response_model=EmployeeResponse
+)
 def approve_employee(
     employee_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     employee = (
         db.query(Employee)
-        .filter(Employee.id == employee_id)
+        .filter(
+            Employee.id == employee_id
+        )
         .first()
     )
 
@@ -95,7 +138,6 @@ def approve_employee(
 
     employee.approval_status = "Approved"
     employee.is_verified = True
-
     employee.approved_by = current_user["id"]
     employee.approved_at = datetime.utcnow()
 
@@ -104,15 +146,26 @@ def approve_employee(
 
     return employee
 
-@router.put("/{employee_id}/reject", response_model=EmployeeResponse)
+
+# --------------------------------------------------
+# Reject Employee
+# --------------------------------------------------
+
+@router.put(
+    "/{employee_id}/reject",
+    response_model=EmployeeResponse
+)
 def reject_employee(
     employee_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     employee = (
         db.query(Employee)
-        .filter(Employee.id == employee_id)
+        .filter(
+            Employee.id == employee_id
+        )
         .first()
     )
 
@@ -124,7 +177,6 @@ def reject_employee(
 
     employee.approval_status = "Rejected"
     employee.is_verified = False
-
     employee.approved_by = current_user["id"]
     employee.approved_at = datetime.utcnow()
 
@@ -134,15 +186,25 @@ def reject_employee(
     return employee
 
 
-@router.get("/{employee_id}", response_model=EmployeeResponse)
+# --------------------------------------------------
+# Get Single Employee
+# --------------------------------------------------
+
+@router.get(
+    "/{employee_id}",
+    response_model=EmployeeResponse
+)
 def get_employee(
     employee_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+
     employee = (
         db.query(Employee)
-        .filter(Employee.id == employee_id)
+        .filter(
+            Employee.id == employee_id
+        )
         .first()
     )
 
@@ -155,16 +217,26 @@ def get_employee(
     return employee
 
 
-@router.put("/{employee_id}", response_model=EmployeeResponse)
+# --------------------------------------------------
+# Update Employee
+# --------------------------------------------------
+
+@router.put(
+    "/{employee_id}",
+    response_model=EmployeeResponse
+)
 def update_employee(
     employee_id: int,
     employee_data: EmployeeUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     employee = (
         db.query(Employee)
-        .filter(Employee.id == employee_id)
+        .filter(
+            Employee.id == employee_id
+        )
         .first()
     )
 
@@ -181,21 +253,34 @@ def update_employee(
     employee.role = employee_data.role
     employee.is_active = employee_data.is_active
 
+    # Shift schedule
+    employee.shift_start = employee_data.shift_start
+    employee.shift_end = employee_data.shift_end
+
     db.commit()
     db.refresh(employee)
 
     return employee
 
 
-@router.delete("/{employee_id}")
+# --------------------------------------------------
+# Delete Employee
+# --------------------------------------------------
+
+@router.delete(
+    "/{employee_id}"
+)
 def delete_employee(
     employee_id: int,
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+
     employee = (
         db.query(Employee)
-        .filter(Employee.id == employee_id)
+        .filter(
+            Employee.id == employee_id
+        )
         .first()
     )
 
