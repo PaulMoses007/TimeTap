@@ -786,3 +786,157 @@ def get_attendance_analytics(
         "alerts":
             adaptive_alerts,
     }
+
+# ============================================================
+# DAILY ATTENDANCE TREND
+# ============================================================
+
+def get_attendance_trend(
+    db: Session,
+    days: int = 30
+):
+    """
+    Process attendance history day by day.
+
+    Returns:
+    - attendance count
+    - total worked hours
+    - average worked hours
+    - late arrivals
+
+    for each day in the selected period.
+    """
+
+    now_riga = datetime.now(
+        RIGA_TIMEZONE
+    )
+
+    today = now_riga.date()
+
+    start_date = (
+        today
+        - timedelta(days=days - 1)
+    )
+
+    # --------------------------------------------------------
+    # Get attendance records
+    # --------------------------------------------------------
+
+    records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.work_date >= start_date,
+            Attendance.work_date <= today
+        )
+        .all()
+    )
+
+    # --------------------------------------------------------
+    # Get employees
+    # --------------------------------------------------------
+
+    employees = (
+        db.query(Employee)
+        .filter(
+            Employee.is_active == True,
+            Employee.role != "Manager"
+        )
+        .all()
+    )
+
+    employee_map = {
+        employee.id: employee
+        for employee in employees
+    }
+
+    trends = []
+
+    # --------------------------------------------------------
+    # Process each day
+    # --------------------------------------------------------
+
+    for day_offset in range(days):
+
+        current_date = (
+            start_date
+            + timedelta(days=day_offset)
+        )
+
+        daily_records = [
+            record
+            for record in records
+            if record.work_date == current_date
+        ]
+
+        attendance_count = len(
+            daily_records
+        )
+
+        total_worked_minutes = sum(
+            record.worked_minutes or 0
+            for record in daily_records
+        )
+
+        total_worked_hours = round(
+            total_worked_minutes / 60,
+            2
+        )
+
+        if attendance_count > 0:
+
+            average_worked_hours = round(
+                total_worked_hours
+                / attendance_count,
+                2
+            )
+
+        else:
+
+            average_worked_hours = 0.0
+
+        # ----------------------------------------------------
+        # Calculate daily late arrivals
+        # ----------------------------------------------------
+
+        daily_late_arrivals = 0
+
+        for record in daily_records:
+
+            employee = employee_map.get(
+                record.employee_id
+            )
+
+            if employee is None:
+                continue
+
+            late_count, _ = (
+                _calculate_late_minutes(
+                    employee,
+                    [record]
+                )
+            )
+
+            daily_late_arrivals += (
+                late_count
+            )
+
+        trends.append(
+            {
+                "date":
+                    current_date.isoformat(),
+
+                "attendance_count":
+                    attendance_count,
+
+                "total_worked_hours":
+                    total_worked_hours,
+
+                "average_worked_hours":
+                    average_worked_hours,
+
+                "late_arrivals":
+                    daily_late_arrivals,
+            }
+        )
+
+    return trends

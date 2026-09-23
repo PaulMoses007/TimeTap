@@ -49,3 +49,11 @@ class AnalyticsSummary(BaseModel):
     employees: list[EmployeeAnalytics]
 
     alerts: list[AdaptiveAlert]
+
+
+class AttendanceTrend(BaseModel):
+    date: str
+    attendance_count: int
+    total_worked_hours: float
+    average_worked_hours: float
+    late_arrivals: int

@@ -33,8 +33,19 @@ import ScheduleIcon from "@mui/icons-material/Schedule";
 import WarningIcon from "@mui/icons-material/Warning";
 import AccessAlarmIcon from "@mui/icons-material/AccessAlarm";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
-import ErrorIcon from "@mui/icons-material/Error";
-import InfoIcon from "@mui/icons-material/Info";
+
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 import api from "../../api/axios";
 
@@ -43,6 +54,7 @@ function Reports() {
   const navigate = useNavigate();
 
   const [analytics, setAnalytics] = useState(null);
+  const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -56,11 +68,14 @@ function Reports() {
     setError("");
 
     try {
-      const response = await api.get(
-        "/analytics/attendance"
-      );
+      const [analyticsResponse, trendResponse] =
+        await Promise.all([
+          api.get("/analytics/attendance"),
+          api.get("/analytics/attendance-trend"),
+        ]);
 
-      setAnalytics(response.data);
+      setAnalytics(analyticsResponse.data);
+      setTrendData(trendResponse.data);
 
     } catch (err) {
       console.error(err);
@@ -190,33 +205,107 @@ function Reports() {
   };
 
 
-  const getAlertSeverity = (severity) => {
-    if (severity === "error") {
-      return "error";
+  // ============================================================
+  // ADAPTIVE INSIGHT GENERATION
+  // ============================================================
+
+  const getAdaptiveInsights = () => {
+    if (
+      !analytics ||
+      !analytics.employees ||
+      analytics.employees.length === 0
+    ) {
+      return [];
     }
 
-    if (severity === "warning") {
-      return "warning";
+    const insights = [];
+
+
+    // ----------------------------------------------------------
+    // Overall attendance
+    // ----------------------------------------------------------
+
+    if (
+      analytics.average_attendance_rate >= 90
+    ) {
+      insights.push(
+        `The current employee attendance rate is ${analytics.average_attendance_rate}%.`
+      );
+    } else {
+      insights.push(
+        `The current employee attendance rate is ${analytics.average_attendance_rate}%, based on the available attendance history.`
+      );
     }
 
-    if (severity === "success") {
-      return "success";
+
+    // ----------------------------------------------------------
+    // Fixed schedule employees
+    // ----------------------------------------------------------
+
+    const fixedEmployees =
+      analytics.employees.filter(
+        (employee) =>
+          employee.schedule_type === "Fixed"
+      );
+
+
+    fixedEmployees.forEach((employee) => {
+      if (employee.late_arrivals > 0) {
+        insights.push(
+          `${employee.first_name} ${employee.last_name} has ${employee.late_arrivals} late arrival${employee.late_arrivals > 1 ? "s" : ""} in the analysis period, with an average lateness of ${employee.average_late_minutes} minutes.`
+        );
+      } else {
+        insights.push(
+          `${employee.first_name} ${employee.last_name} has no recorded late arrivals in the current analysis period.`
+        );
+      }
+    });
+
+
+    // ----------------------------------------------------------
+    // Flexible schedule employees
+    // ----------------------------------------------------------
+
+    const flexibleEmployees =
+      analytics.employees.filter(
+        (employee) =>
+          employee.schedule_type === "Flexible"
+      );
+
+
+    flexibleEmployees.forEach((employee) => {
+      if (employee.average_check_in) {
+        insights.push(
+          `${employee.first_name} ${employee.last_name} has an observed average check-in time of ${employee.average_check_in} based on recorded attendance.`
+        );
+      }
+
+      if (employee.average_shift_hours > 0) {
+        insights.push(
+          `The average completed shift for ${employee.first_name} ${employee.last_name} is ${employee.average_shift_hours} hours.`
+        );
+      }
+    });
+
+
+    // ----------------------------------------------------------
+    // Low attendance
+    // ----------------------------------------------------------
+
+    if (
+      analytics.employees_with_low_attendance > 0
+    ) {
+      insights.push(
+        `${analytics.employees_with_low_attendance} employee${analytics.employees_with_low_attendance > 1 ? "s have" : " has"} an attendance rate below the current analysis threshold.`
+      );
+    } else {
+      insights.push(
+        "No employees are currently below the configured low-attendance threshold."
+      );
     }
 
-    return "info";
-  };
 
-
-  const getAlertIcon = (severity) => {
-    if (severity === "error") {
-      return <ErrorIcon />;
-    }
-
-    if (severity === "warning") {
-      return <WarningIcon />;
-    }
-
-    return <InfoIcon />;
+    return insights;
   };
 
 
@@ -251,9 +340,9 @@ function Reports() {
       }}
     >
 
-      {/* ======================================================
-          SIDEBAR
-      ====================================================== */}
+      {/* ====================================================== */}
+      {/* SIDEBAR */}
+      {/* ====================================================== */}
 
       <Box
         sx={{
@@ -271,7 +360,6 @@ function Reports() {
             borderBottom: "1px solid #e0e0e0",
           }}
         >
-
           <Typography
             variant="h5"
             fontWeight="bold"
@@ -286,7 +374,6 @@ function Reports() {
           >
             Manager Panel
           </Typography>
-
         </Box>
 
 
@@ -354,9 +441,9 @@ function Reports() {
       </Box>
 
 
-      {/* ======================================================
-          MAIN CONTENT
-      ====================================================== */}
+      {/* ====================================================== */}
+      {/* MAIN CONTENT */}
+      {/* ====================================================== */}
 
       <Box
         sx={{
@@ -366,9 +453,9 @@ function Reports() {
         }}
       >
 
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
+        {/* ==================================================== */}
+        {/* HEADER */}
+        {/* ==================================================== */}
 
         <Box
           display="flex"
@@ -408,9 +495,9 @@ function Reports() {
         </Box>
 
 
-        {/* ====================================================
-            ERROR
-        ==================================================== */}
+        {/* ==================================================== */}
+        {/* ERROR */}
+        {/* ==================================================== */}
 
         {error && (
           <Alert
@@ -425,9 +512,9 @@ function Reports() {
         {analytics && (
           <>
 
-            {/* =================================================
-                SUMMARY CARDS
-            ================================================= */}
+            {/* ================================================= */}
+            {/* SUMMARY CARDS */}
+            {/* ================================================= */}
 
             <Box
               sx={{
@@ -602,57 +689,12 @@ function Reports() {
                 </CardContent>
               </Card>
 
-
-              {/* Adaptive Alerts */}
-
-              <Card>
-                <CardContent>
-
-                  <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="center"
-                  >
-
-                    <Box>
-
-                      <Typography
-                        color="text.secondary"
-                        variant="body2"
-                      >
-                        Adaptive Alerts
-                      </Typography>
-
-                      <Typography
-                        variant="h4"
-                        fontWeight="bold"
-                        sx={{ mt: 1 }}
-                      >
-                        {analytics.alerts?.length || 0}
-                      </Typography>
-
-                    </Box>
-
-                    <WarningIcon
-                      color={
-                        analytics.alerts?.length > 0
-                          ? "warning"
-                          : "success"
-                      }
-                      sx={{ fontSize: 40 }}
-                    />
-
-                  </Box>
-
-                </CardContent>
-              </Card>
-
             </Box>
 
 
-            {/* =================================================
-                SECONDARY SUMMARY
-            ================================================= */}
+            {/* ================================================= */}
+            {/* SECONDARY SUMMARY */}
+            {/* ================================================= */}
 
             <Box
               sx={{
@@ -813,9 +855,9 @@ function Reports() {
             </Box>
 
 
-            {/* =================================================
-                ADAPTIVE ALERTS
-            ================================================= */}
+            {/* ================================================= */}
+            {/* ATTENDANCE TRENDS */}
+            {/* ================================================= */}
 
             <Paper
               sx={{
@@ -827,107 +869,195 @@ function Reports() {
               <Box
                 display="flex"
                 alignItems="center"
-                justifyContent="space-between"
-                mb={2}
+                gap={1}
+                mb={1}
               >
 
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  gap={1}
+                <TrendingUpIcon color="primary" />
+
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
                 >
-
-                  <TrendingUpIcon color="primary" />
-
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                  >
-                    Adaptive Insights & Alerts
-                  </Typography>
-
-                </Box>
-
-
-                <Chip
-                  label={`${analytics.alerts?.length || 0} alert${
-                    analytics.alerts?.length === 1
-                      ? ""
-                      : "s"
-                  }`}
-                  color={
-                    analytics.alerts?.length > 0
-                      ? "warning"
-                      : "success"
-                  }
-                  variant="outlined"
-                />
+                  Attendance Trends
+                </Typography>
 
               </Box>
-
 
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ mb: 2 }}
+                sx={{ mb: 3 }}
               >
-                Alerts are generated automatically by the
-                TimeTap attendance analytics engine using
-                processed employee attendance history.
+                Daily attendance activity processed from
+                the last 30 days of recorded data.
               </Typography>
 
+              <Divider sx={{ mb: 3 }} />
 
-              <Divider sx={{ mb: 2 }} />
 
+              {/* --------------------------------------------- */}
+              {/* DAILY ATTENDANCE AND LATE ARRIVALS */}
+              {/* --------------------------------------------- */}
 
-              {analytics.alerts &&
-              analytics.alerts.length > 0 ? (
+              <Typography
+                variant="subtitle1"
+                fontWeight="bold"
+                sx={{ mb: 2 }}
+              >
+                Daily Attendance & Late Arrivals
+              </Typography>
 
-                <Box>
+              {trendData.length > 0 ? (
 
-                  {analytics.alerts.map(
-                    (alert, index) => (
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 350,
+                  }}
+                >
 
-                      <Alert
-                        key={`${alert.employee_id}-${alert.alert_type}-${index}`}
-                        severity={getAlertSeverity(
-                          alert.severity
-                        )}
-                        icon={getAlertIcon(
-                          alert.severity
-                        )}
-                        sx={{ mb: 1.5 }}
-                      >
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                  >
 
-                        <Typography
-                          fontWeight="bold"
-                          component="span"
-                        >
-                          {alert.alert_type}
-                        </Typography>
+                    <LineChart
+                      data={trendData}
+                      margin={{
+                        top: 10,
+                        right: 30,
+                        left: 10,
+                        bottom: 10,
+                      }}
+                    >
 
-                        <Typography
-                          component="span"
-                          sx={{ ml: 1 }}
-                        >
-                          {alert.message}
-                        </Typography>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                      />
 
-                      </Alert>
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) =>
+                          value.slice(5)
+                        }
+                      />
 
-                    )
-                  )}
+                      <YAxis
+                        allowDecimals={false}
+                      />
+
+                      <Tooltip />
+
+                      <Legend />
+
+                      <Line
+                        type="monotone"
+                        dataKey="attendance_count"
+                        name="Attendance"
+                        stroke="#1976d2"
+                        strokeWidth={3}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 6 }}
+                      />
+
+                      <Line
+                        type="monotone"
+                        dataKey="late_arrivals"
+                        name="Late Arrivals"
+                        stroke="#ed6c02"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+
+                    </LineChart>
+
+                  </ResponsiveContainer>
 
                 </Box>
 
               ) : (
 
-                <Alert
-                  severity="success"
-                  icon={<EventAvailableIcon />}
+                <Alert severity="info">
+                  No attendance trend data is available
+                  for the current analysis period.
+                </Alert>
+
+              )}
+
+
+              {/* --------------------------------------------- */}
+              {/* DAILY WORKED HOURS */}
+              {/* --------------------------------------------- */}
+
+              <Typography
+                variant="subtitle1"
+                fontWeight="bold"
+                sx={{
+                  mt: 5,
+                  mb: 2,
+                }}
+              >
+                Daily Worked Hours
+              </Typography>
+
+              {trendData.length > 0 ? (
+
+                <Box
+                  sx={{
+                    width: "100%",
+                    height: 350,
+                  }}
                 >
-                  No adaptive alerts were generated
-                  from the current attendance data.
+
+                  <ResponsiveContainer
+                    width="100%"
+                    height="100%"
+                  >
+
+                    <BarChart
+                      data={trendData}
+                      margin={{
+                        top: 10,
+                        right: 30,
+                        left: 10,
+                        bottom: 10,
+                      }}
+                    >
+
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                      />
+
+                      <XAxis
+                        dataKey="date"
+                        tickFormatter={(value) =>
+                          value.slice(5)
+                        }
+                      />
+
+                      <YAxis />
+
+                      <Tooltip />
+
+                      <Legend />
+
+                      <Bar
+                        dataKey="total_worked_hours"
+                        name="Worked Hours"
+                        fill="#1976d2"
+                      />
+
+                    </BarChart>
+
+                  </ResponsiveContainer>
+
+                </Box>
+
+              ) : (
+
+                <Alert severity="info">
+                  No worked-hour data is available.
                 </Alert>
 
               )}
@@ -935,9 +1065,77 @@ function Reports() {
             </Paper>
 
 
-            {/* =================================================
-                EMPLOYEE ANALYTICS
-            ================================================= */}
+            {/* ================================================= */}
+            {/* ADAPTIVE INSIGHTS */}
+            {/* ================================================= */}
+
+            <Paper
+              sx={{
+                p: 3,
+                mb: 4,
+              }}
+            >
+
+              <Box
+                display="flex"
+                alignItems="center"
+                gap={1}
+                mb={2}
+              >
+
+                <TrendingUpIcon color="primary" />
+
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                >
+                  Adaptive Insights
+                </Typography>
+
+              </Box>
+
+              <Divider sx={{ mb: 2 }} />
+
+
+              {analytics.total_attendance_records === 0 ? (
+
+                <Alert severity="info">
+                  No attendance records are available
+                  for the current analysis period.
+                </Alert>
+
+              ) : (
+
+                <Box>
+
+                  {getAdaptiveInsights().map(
+                    (insight, index) => (
+                      <Alert
+                        key={index}
+                        severity={
+                          insight.includes(
+                            "late arrival"
+                          )
+                            ? "warning"
+                            : "info"
+                        }
+                        sx={{ mb: 1 }}
+                      >
+                        {insight}
+                      </Alert>
+                    )
+                  )}
+
+                </Box>
+
+              )}
+
+            </Paper>
+
+
+            {/* ================================================= */}
+            {/* EMPLOYEE ANALYTICS */}
+            {/* ================================================= */}
 
             <Paper
               sx={{
@@ -1103,7 +1301,7 @@ function Reports() {
                             </TableCell>
 
 
-                            {/* Schedule */}
+                            {/* Schedule Type */}
 
                             <TableCell>
 
@@ -1194,7 +1392,7 @@ function Reports() {
                             </TableCell>
 
 
-                            {/* Average Late */}
+                            {/* Average Late Minutes */}
 
                             <TableCell align="center">
 
@@ -1234,14 +1432,18 @@ function Reports() {
                             {/* Days Present */}
 
                             <TableCell align="center">
+
                               {employee.days_present}
+
                             </TableCell>
 
 
                             {/* Worked Hours */}
 
                             <TableCell align="center">
+
                               {employee.total_worked_hours}
+
                             </TableCell>
 
 
@@ -1277,29 +1479,21 @@ function Reports() {
             </Paper>
 
 
-            {/* =================================================
-                DATA PROCESSING INFORMATION
-            ================================================= */}
+            {/* ================================================= */}
+            {/* DATA PROCESSING INFORMATION */}
+            {/* ================================================= */}
 
             <Alert
               severity="info"
-              icon={<TrendingUpIcon />}
+              icon={<WarningIcon />}
               sx={{ mt: 3 }}
             >
 
-              <Typography
-                fontWeight="bold"
-                sx={{ mb: 0.5 }}
-              >
-                Adaptive Data Processing
-              </Typography>
-
-              TimeTap processes historical attendance
-              records to calculate working time,
+              TimeTap processes recorded attendance
+              history to calculate working time,
               attendance rates, employee schedules,
-              average check-in and check-out patterns,
-              fixed-schedule lateness, and adaptive
-              employee alerts.
+              check-in patterns and fixed-schedule
+              lateness indicators.
 
             </Alert>
 
