@@ -1036,6 +1036,29 @@ def get_workforce_insights(
                         )
                     )
 
+            else:
+
+                insights.append(
+                    WorkforceInsight(
+                        insight_type=(
+                            "Worked Hours Stable"
+                        ),
+                        severity="info",
+                        title=(
+                            "Worked hours are stable"
+                        ),
+                        message=(
+                            "Daily worked hours changed by only "
+                            f"{abs(worked_hours_change):.2f}% "
+                            "compared with the previous period."
+                        ),
+                        metric=round(
+                            worked_hours_change,
+                            2,
+                        ),
+                    )
+                )
+
     # ========================================================
     # LATENESS COMPARISON
     # ========================================================
@@ -1122,5 +1145,26 @@ def get_workforce_insights(
                         ),
                     )
                 )
+
+        else:
+
+            insights.append(
+                WorkforceInsight(
+                    insight_type=(
+                        "Lateness Stable"
+                    ),
+                    severity="info",
+                    title="Late arrivals are stable",
+                    message=(
+                        "Late arrivals changed by only "
+                        f"{abs(lateness_change):.2f}% "
+                        "compared with the previous period."
+                    ),
+                    metric=round(
+                        lateness_change,
+                        2,
+                    ),
+                )
+            )
 
     return insights
