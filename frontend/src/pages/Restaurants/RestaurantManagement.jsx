@@ -10,6 +10,10 @@ import {
   CardContent,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   List,
@@ -31,6 +35,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
 
 import {
   getRestaurants,
@@ -53,6 +58,10 @@ function RestaurantManagement() {
     phone: "",
     email: "",
   });
+
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] =
+    useState(null);
 
   useEffect(() => {
     loadRestaurants();
@@ -136,6 +145,34 @@ function RestaurantManagement() {
           "Failed to create restaurant."
       );
     }
+  };
+
+  const handleOpenQr = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setQrDialogOpen(true);
+  };
+
+  const handleCloseQr = () => {
+    setQrDialogOpen(false);
+    setSelectedRestaurant(null);
+  };
+
+  const handleDownloadQr = () => {
+    if (!selectedRestaurant) {
+      return;
+    }
+
+    const link = document.createElement("a");
+
+    link.href = `/api/restaurants/${selectedRestaurant.id}/qr`;
+
+    link.download = `restaurant_${selectedRestaurant.id}.png`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    document.body.removeChild(link);
   };
 
   const handleLogout = () => {
@@ -656,17 +693,43 @@ function RestaurantManagement() {
                           "-"}
                       </Typography>
 
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        startIcon={
-                          <DeleteIcon />
-                        }
-                        disabled
-                        fullWidth
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 1,
+                          flexDirection: {
+                            xs: "column",
+                            sm: "row",
+                          },
+                        }}
                       >
-                        Delete
-                      </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={
+                            <QrCode2Icon />
+                          }
+                          onClick={() =>
+                            handleOpenQr(
+                              restaurant
+                            )
+                          }
+                          fullWidth
+                        >
+                          View QR Code
+                        </Button>
+
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          startIcon={
+                            <DeleteIcon />
+                          }
+                          disabled
+                          fullWidth
+                        >
+                          Delete
+                        </Button>
+                      </Box>
                     </CardContent>
                   </Card>
                 )
@@ -675,6 +738,97 @@ function RestaurantManagement() {
           )}
         </Container>
       </Box>
+
+      {/* QR CODE DIALOG */}
+      <Dialog
+        open={qrDialogOpen}
+        onClose={handleCloseQr}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle fontWeight="bold">
+          Restaurant QR Code
+        </DialogTitle>
+
+        <DialogContent>
+          {selectedRestaurant && (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                py: 2,
+              }}
+            >
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                sx={{ mb: 1 }}
+              >
+                {selectedRestaurant.name}
+              </Typography>
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 3 }}
+              >
+                Employees can scan this QR code
+                to record attendance.
+              </Typography>
+
+              <Box
+                component="img"
+                src={`/api/restaurants/${selectedRestaurant.id}/qr`}
+                alt={`${selectedRestaurant.name} QR Code`}
+                sx={{
+                  width: 300,
+                  height: 300,
+                  objectFit: "contain",
+                  border:
+                    "1px solid #e4e7eb",
+                  borderRadius: 2,
+                  p: 2,
+                  bgcolor: "white",
+                }}
+              />
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mt: 2,
+                  textAlign: "center",
+                }}
+              >
+                Restaurant #
+                {selectedRestaurant.id}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 3,
+          }}
+        >
+          <Button
+            onClick={handleCloseQr}
+          >
+            Close
+          </Button>
+
+          <Button
+            variant="contained"
+            startIcon={<QrCode2Icon />}
+            onClick={handleDownloadQr}
+          >
+            Download QR Code
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

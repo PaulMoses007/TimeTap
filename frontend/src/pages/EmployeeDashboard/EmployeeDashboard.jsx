@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 import {
   Alert,
@@ -26,6 +27,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LoginIcon from "@mui/icons-material/Login";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 
 import {
   checkIn,
@@ -40,36 +42,138 @@ function decodeToken(token) {
     const payload = token.split(".")[1];
 
     const decodedPayload = atob(
-      payload
-        .replace(/-/g, "+")
-        .replace(/_/g, "/")
+      payload.replace(/-/g, "+").replace(/_/g, "/")
     );
 
     return JSON.parse(decodedPayload);
   } catch (error) {
-    console.error(
-      "Failed to decode token:",
-      error
-    );
-
+    console.error("Failed to decode token:", error);
     return null;
   }
+}
+
+/*
+ * Extract restaurant ID from different possible QR formats.
+ *
+ * Supported examples:
+ * 1
+ * restaurant:1
+ * restaurant_1
+ * restaurant/1
+ * https://example.com/restaurant/1
+ * {"restaurant_id":1}
+ * {"restaurantId":1}
+ * https://example.com/?restaurant_id=1
+ */
+function extractRestaurantId(decodedText) {
+  if (!decodedText) {
+    return null;
+  }
+
+  const text = decodedText.trim();
+
+  // Plain number: 1
+  if (/^\d+$/.test(text)) {
+    return Number(text);
+  }
+
+  // restaurant_id=1
+  const keyValueMatch = text.match(
+    /(?:restaurant_id|restaurantId)\s*=\s*(\d+)/i
+  );
+
+  if (keyValueMatch) {
+    return Number(keyValueMatch[1]);
+  }
+
+  // JSON formats:
+  // {"restaurant_id":1}
+  // {"restaurantId":1}
+  // {"id":1}
+  try {
+    const parsed = JSON.parse(text);
+
+    if (parsed?.restaurant_id !== undefined) {
+      return Number(parsed.restaurant_id);
+    }
+
+    if (parsed?.restaurantId !== undefined) {
+      return Number(parsed.restaurantId);
+    }
+
+    if (parsed?.id !== undefined) {
+      return Number(parsed.id);
+    }
+  } catch {
+    // Not JSON, continue.
+  }
+
+  // URL formats
+  try {
+    const url = new URL(text);
+
+    const queryRestaurantId =
+      url.searchParams.get("restaurant_id") ||
+      url.searchParams.get("restaurantId");
+
+    if (
+      queryRestaurantId &&
+      /^\d+$/.test(queryRestaurantId)
+    ) {
+      return Number(queryRestaurantId);
+    }
+
+    const pathMatch = url.pathname.match(
+      /restaurant(?:s)?[\/_-](\d+)/i
+    );
+
+    if (pathMatch) {
+      return Number(pathMatch[1]);
+    }
+
+    const numericParts =
+      url.pathname.match(/\d+/g);
+
+    if (numericParts?.length) {
+      return Number(
+        numericParts[numericParts.length - 1]
+      );
+    }
+  } catch {
+    // Not a URL, continue checking text.
+  }
+
+  // Other restaurant formats:
+  // restaurant:1
+  // restaurant_1
+  // restaurant/1
+  // restaurant-1
+  const restaurantMatch = text.match(
+    /restaurant[\s:_/-]*(\d+)/i
+  );
+
+  if (restaurantMatch) {
+    return Number(restaurantMatch[1]);
+  }
+
+  return null;
 }
 
 function EmployeeDashboard() {
   const navigate = useNavigate();
 
   const [attendance, setAttendance] = useState(null);
-  const [restaurantId, setRestaurantId] =
-    useState(null);
+  const [restaurantId, setRestaurantId] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] =
-    useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] =
-    useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannedData, setScannedData] = useState("");
+  const [scannerError, setScannerError] = useState("");
 
   const loadAttendance = async () => {
     try {
@@ -87,13 +191,10 @@ function EmployeeDashboard() {
         .split("T")[0];
 
       const todayRecord = records.find(
-        (record) =>
-          record.work_date === today
+        (record) => record.work_date === today
       );
 
-      setAttendance(
-        todayRecord || null
-      );
+      setAttendance(todayRecord || null);
     } catch (err) {
       console.error(err);
 
@@ -108,9 +209,7 @@ function EmployeeDashboard() {
     const initialize = async () => {
       try {
         const token =
-          localStorage.getItem(
-            "access_token"
-          );
+          localStorage.getItem("access_token");
 
         if (!token) {
           navigate("/");
@@ -120,10 +219,7 @@ function EmployeeDashboard() {
         const user = decodeToken(token);
 
         if (!user || !user.id) {
-          localStorage.removeItem(
-            "access_token"
-          );
-
+          localStorage.removeItem("access_token");
           navigate("/");
           return;
         }
@@ -147,8 +243,7 @@ function EmployeeDashboard() {
           );
         }
 
-        const employee =
-          await response.json();
+        const employee = await response.json();
 
         if (!employee.restaurant_id) {
           throw new Error(
@@ -156,9 +251,7 @@ function EmployeeDashboard() {
           );
         }
 
-        setRestaurantId(
-          employee.restaurant_id
-        );
+        setRestaurantId(employee.restaurant_id);
 
         await loadAttendance();
       } catch (err) {
@@ -176,6 +269,9 @@ function EmployeeDashboard() {
     initialize();
   }, [navigate]);
 
+  /*
+   * Normal check-in function.
+   */
   const handleCheckIn = async () => {
     if (!restaurantId) {
       setError(
@@ -188,9 +284,7 @@ function EmployeeDashboard() {
     setError("");
 
     try {
-      const data = await checkIn(
-        restaurantId
-      );
+      const data = await checkIn(restaurantId);
 
       setAttendance(data);
 
@@ -209,6 +303,9 @@ function EmployeeDashboard() {
     }
   };
 
+  /*
+   * Normal check-out function.
+   */
   const handleCheckOut = async () => {
     if (!restaurantId) {
       setError(
@@ -221,9 +318,7 @@ function EmployeeDashboard() {
     setError("");
 
     try {
-      const data = await checkOut(
-        restaurantId
-      );
+      const data = await checkOut(restaurantId);
 
       setAttendance(data);
 
@@ -241,6 +336,242 @@ function EmployeeDashboard() {
       setProcessing(false);
     }
   };
+
+  /*
+   * Open QR scanner.
+   */
+  const handleOpenScanner = () => {
+    setScannedData("");
+    setScannerError("");
+    setScannerOpen(true);
+  };
+
+  /*
+   * Close QR scanner.
+   */
+  const handleCloseScanner = () => {
+    setScannerOpen(false);
+    setScannedData("");
+    setScannerError("");
+  };
+
+  /*
+   * Process the scanned restaurant QR code.
+   *
+   * If the employee has no attendance record today:
+   *     scan -> check in
+   *
+   * If the employee is currently working:
+   *     scan -> check out
+   *
+   * If today's attendance is already completed:
+   *     show message.
+   */
+  const handleQrScan = async (decodedText) => {
+    if (processing) {
+      return;
+    }
+
+    setScannedData(decodedText);
+    setScannerError("");
+
+    const scannedRestaurantId =
+      extractRestaurantId(decodedText);
+
+    console.log(
+      "Scanned QR data:",
+      decodedText
+    );
+
+    console.log(
+      "Scanned restaurant ID:",
+      scannedRestaurantId
+    );
+
+    console.log(
+      "Employee restaurant ID:",
+      restaurantId
+    );
+
+    if (!scannedRestaurantId) {
+      setScannerError(
+        "Invalid restaurant QR code. Please scan the QR code displayed by the restaurant."
+      );
+      return;
+    }
+
+    /*
+     * Security/validation:
+     * The employee can only record attendance
+     * for their assigned restaurant.
+     */
+    if (
+      Number(scannedRestaurantId) !==
+      Number(restaurantId)
+    ) {
+      setScannerError(
+        "This QR code belongs to a different restaurant."
+      );
+      return;
+    }
+
+    /*
+     * Stop scanner before performing attendance operation.
+     */
+    setScannerOpen(false);
+
+    /*
+     * No attendance today -> CHECK IN
+     */
+    if (!attendance) {
+      setProcessing(true);
+      setError("");
+
+      try {
+        const data = await checkIn(
+          scannedRestaurantId
+        );
+
+        setAttendance(data);
+
+        setSuccessMessage(
+          "QR scan successful. You have successfully checked in."
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err.response?.data?.detail ||
+            "QR check-in failed."
+        );
+      } finally {
+        setProcessing(false);
+      }
+
+      return;
+    }
+
+    /*
+     * Attendance exists but employee is still working
+     * -> CHECK OUT
+     */
+    if (
+      attendance &&
+      !attendance.check_out
+    ) {
+      setProcessing(true);
+      setError("");
+
+      try {
+        const data = await checkOut(
+          scannedRestaurantId
+        );
+
+        setAttendance(data);
+
+        setSuccessMessage(
+          "QR scan successful. You have successfully checked out."
+        );
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          err.response?.data?.detail ||
+            "QR check-out failed."
+        );
+      } finally {
+        setProcessing(false);
+      }
+
+      return;
+    }
+
+    /*
+     * Attendance already completed.
+     */
+    setSuccessMessage(
+      "Today's attendance has already been completed."
+    );
+  };
+
+  /*
+   * Create and manage the camera scanner.
+   */
+  useEffect(() => {
+    if (!scannerOpen) {
+      return;
+    }
+
+    let scanner;
+
+    const startScanner = () => {
+      try {
+        scanner = new Html5QrcodeScanner(
+          "employee-qr-reader",
+          {
+            fps: 10,
+            qrbox: {
+              width: 250,
+              height: 250,
+            },
+            rememberLastUsedCamera: true,
+          },
+          false
+        );
+
+        scanner.render(
+          async (decodedText) => {
+            try {
+              await scanner.clear();
+            } catch (error) {
+              console.error(
+                "Failed to stop scanner:",
+                error
+              );
+            }
+
+            await handleQrScan(decodedText);
+          },
+          () => {
+            /*
+             * The scanner continuously reports
+             * unsuccessful decode attempts.
+             * We intentionally do not display them.
+             */
+          }
+        );
+      } catch (error) {
+        console.error(
+          "Failed to start QR scanner:",
+          error
+        );
+
+        setScannerError(
+          "Unable to start the camera. Please allow camera access and try again."
+        );
+      }
+    };
+
+    /*
+     * Small delay allows the scanner container
+     * to be mounted before Html5QrcodeScanner
+     * initializes.
+     */
+    const timer = setTimeout(
+      startScanner,
+      100
+    );
+
+    return () => {
+      clearTimeout(timer);
+
+      if (scanner) {
+        scanner
+          .clear()
+          .catch(() => {});
+      }
+    };
+  }, [scannerOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem(
@@ -529,8 +860,8 @@ function EmployeeDashboard() {
                   : "You are currently not checked in."}
               </Typography>
 
-              {/* CHECK IN */}
-              {!attendance && (
+              {/* QR SCANNER BUTTON */}
+              {!isCheckedOut && (
                 <Button
                   variant="contained"
                   size="large"
@@ -541,45 +872,78 @@ function EmployeeDashboard() {
                         color="inherit"
                       />
                     ) : (
-                      <LoginIcon />
+                      <QrCodeScannerIcon />
                     )
                   }
                   onClick={
-                    handleCheckIn
+                    handleOpenScanner
                   }
                   disabled={processing}
+                  sx={{ mb: 2 }}
                 >
                   {processing
-                    ? "Checking In..."
-                    : "Check In"}
+                    ? "Processing..."
+                    : isWorking
+                    ? "Scan QR to Check Out"
+                    : "Scan QR to Check In"}
                 </Button>
               )}
 
-              {/* CHECK OUT */}
+              {/* NORMAL CHECK IN */}
+              {!attendance && (
+                <Box>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={
+                      processing ? (
+                        <CircularProgress
+                          size={20}
+                          color="inherit"
+                        />
+                      ) : (
+                        <LoginIcon />
+                      )
+                    }
+                    onClick={
+                      handleCheckIn
+                    }
+                    disabled={processing}
+                  >
+                    {processing
+                      ? "Checking In..."
+                      : "Check In Manually"}
+                  </Button>
+                </Box>
+              )}
+
+              {/* NORMAL CHECK OUT */}
               {isWorking && (
-                <Button
-                  variant="contained"
-                  color="error"
-                  size="large"
-                  startIcon={
-                    processing ? (
-                      <CircularProgress
-                        size={20}
-                        color="inherit"
-                      />
-                    ) : (
-                      <LogoutOutlinedIcon />
-                    )
-                  }
-                  onClick={
-                    handleCheckOut
-                  }
-                  disabled={processing}
-                >
-                  {processing
-                    ? "Checking Out..."
-                    : "Check Out"}
-                </Button>
+                <Box>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="large"
+                    startIcon={
+                      processing ? (
+                        <CircularProgress
+                          size={20}
+                          color="inherit"
+                        />
+                      ) : (
+                        <LogoutOutlinedIcon />
+                      )
+                    }
+                    onClick={
+                      handleCheckOut
+                    }
+                    disabled={processing}
+                  >
+                    {processing
+                      ? "Checking Out..."
+                      : "Check Out Manually"}
+                  </Button>
+                </Box>
               )}
 
               {/* COMPLETED */}
@@ -594,6 +958,112 @@ function EmployeeDashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* QR SCANNER */}
+          {scannerOpen && (
+            <Card
+              elevation={0}
+              sx={{
+                border:
+                  "1px solid #e4e7eb",
+                borderRadius: 3,
+                mb: 3,
+              }}
+            >
+              <CardContent
+                sx={{ p: 4 }}
+              >
+                <Typography
+                  variant="h6"
+                  fontWeight="bold"
+                  sx={{ mb: 1 }}
+                >
+                  Scan Restaurant QR Code
+                </Typography>
+
+                <Typography
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
+                  Point your camera at the
+                  restaurant QR code.
+                </Typography>
+
+                <Box
+                  id="employee-qr-reader"
+                  sx={{
+                    width: "100%",
+                    maxWidth: 500,
+                    mx: "auto",
+
+                    "& video": {
+                      width: "100%",
+                      borderRadius: 2,
+                    },
+
+                    "& img": {
+                      display: "none",
+                    },
+
+                    "& button": {
+                      marginTop: 1,
+                    },
+
+                    "& select": {
+                      padding: 1,
+                      borderRadius: 1,
+                    },
+                  }}
+                />
+
+                {scannerError && (
+                  <Alert
+                    severity="error"
+                    sx={{ mt: 3 }}
+                  >
+                    {scannerError}
+                  </Alert>
+                )}
+
+                {scannedData && (
+                  <Alert
+                    severity={
+                      scannerError
+                        ? "warning"
+                        : "success"
+                    }
+                    sx={{ mt: 3 }}
+                  >
+                    <Typography
+                      fontWeight="bold"
+                    >
+                      QR Code Scanned
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        wordBreak:
+                          "break-word",
+                      }}
+                    >
+                      {scannedData}
+                    </Typography>
+                  </Alert>
+                )}
+
+                <Button
+                  variant="outlined"
+                  sx={{ mt: 3 }}
+                  onClick={
+                    handleCloseScanner
+                  }
+                >
+                  Close Scanner
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* TODAY DETAILS */}
           <Box
