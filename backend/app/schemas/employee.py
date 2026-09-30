@@ -37,8 +37,10 @@ class EmployeeUpdate(BaseModel):
     phone: str
     role: str
     is_active: bool
+    restaurant_id: int | None = None
 
     schedule_type: str = "Flexible"
+    
     shift_start: str | None = None
     shift_end: str | None = None
 

@@ -252,6 +252,7 @@ def update_employee(
     employee.phone = employee_data.phone
     employee.role = employee_data.role
     employee.is_active = employee_data.is_active
+    employee.restaurant_id = employee_data.restaurant_id
 
     # Shift schedule
     employee.shift_start = employee_data.shift_start

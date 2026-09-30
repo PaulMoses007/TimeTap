@@ -32,16 +32,21 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
 
 import {
   createEmployee,
   getEmployees,
   approveEmployee,
   rejectEmployee,
+  updateEmployee,
 } from "../../services/employeeService";
+
+import { getRestaurants } from "../../services/restaurantService";
 
 function EmployeeList() {
   const [employees, setEmployees] = useState([]);
+  const [restaurants, setRestaurants] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -50,6 +55,10 @@ function EmployeeList() {
   const [saving, setSaving] = useState(false);
 
   const [processingId, setProcessingId] = useState(null);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editRestaurantId, setEditRestaurantId] = useState("");
 
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -62,13 +71,32 @@ function EmployeeList() {
     password: "",
   });
 
+  const loadRestaurants = async () => {
+    try {
+      const data = await getRestaurants();
+
+      setRestaurants(
+        Array.isArray(data) ? data : []
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.detail ||
+          "Failed to load restaurants."
+      );
+    }
+  };
+
   const loadEmployees = async () => {
     try {
       setError("");
 
       const data = await getEmployees();
 
-      setEmployees(Array.isArray(data) ? data : []);
+      setEmployees(
+        Array.isArray(data) ? data : []
+      );
     } catch (err) {
       console.error(err);
 
@@ -83,6 +111,7 @@ function EmployeeList() {
 
   useEffect(() => {
     loadEmployees();
+    loadRestaurants();
   }, []);
 
   const handleChange = (event) => {
@@ -187,6 +216,90 @@ function EmployeeList() {
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const handleOpenEditDialog = (employee) => {
+    setEditingEmployee(employee);
+
+    setEditRestaurantId(
+      employee.restaurant_id
+        ? String(employee.restaurant_id)
+        : ""
+    );
+
+    setEditDialogOpen(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    if (!saving) {
+      setEditDialogOpen(false);
+      setEditingEmployee(null);
+      setEditRestaurantId("");
+    }
+  };
+
+  const handleUpdateEmployee = async () => {
+    if (!editingEmployee) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    try {
+      await updateEmployee(
+        editingEmployee.id,
+        {
+          first_name: editingEmployee.first_name,
+          last_name: editingEmployee.last_name,
+          email: editingEmployee.email,
+          phone: editingEmployee.phone,
+          role: editingEmployee.role,
+          is_active: editingEmployee.is_active,
+          restaurant_id: editRestaurantId
+            ? Number(editRestaurantId)
+            : null,
+          schedule_type:
+            editingEmployee.schedule_type ||
+            "Flexible",
+          shift_start:
+            editingEmployee.shift_start || null,
+          shift_end:
+            editingEmployee.shift_end || null,
+        }
+      );
+
+      setEditDialogOpen(false);
+      setEditingEmployee(null);
+      setEditRestaurantId("");
+
+      setSuccessMessage(
+        "Employee restaurant assignment updated successfully."
+      );
+
+      await loadEmployees();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.detail ||
+          "Failed to update employee."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getRestaurantName = (restaurantId) => {
+    if (!restaurantId) {
+      return "Not assigned";
+    }
+
+    const restaurant = restaurants.find(
+      (item) => item.id === restaurantId
+    );
+
+    return restaurant?.name || "Not assigned";
   };
 
   const getApprovalColor = (status) => {
@@ -321,6 +434,10 @@ function EmployeeList() {
                     </TableCell>
 
                     <TableCell>
+                      <strong>Restaurant</strong>
+                    </TableCell>
+
+                    <TableCell>
                       <strong>Status</strong>
                     </TableCell>
 
@@ -338,7 +455,7 @@ function EmployeeList() {
                   {employees.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={9}
+                        colSpan={10}
                         align="center"
                         sx={{ py: 6 }}
                       >
@@ -378,6 +495,12 @@ function EmployeeList() {
                         </TableCell>
 
                         <TableCell>
+                          {getRestaurantName(
+                            employee.restaurant_id
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           <Chip
                             label={
                               employee.is_active
@@ -406,71 +529,82 @@ function EmployeeList() {
                         </TableCell>
 
                         <TableCell align="center">
-                          {employee.approval_status ===
-                            "Pending" && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                justifyContent: "center",
-                                gap: 0.5,
-                              }}
-                            >
-                              <Tooltip title="Approve employee">
-                                <span>
-                                  <IconButton
-                                    color="success"
-                                    onClick={() =>
-                                      handleApprove(
-                                        employee.id
-                                      )
-                                    }
-                                    disabled={
-                                      processingId ===
-                                      employee.id
-                                    }
-                                  >
-                                    {processingId ===
-                                    employee.id ? (
-                                      <CircularProgress
-                                        size={22}
-                                      />
-                                    ) : (
-                                      <CheckIcon />
-                                    )}
-                                  </IconButton>
-                                </span>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            {/* EDIT */}
+                            {employee.approval_status !==
+                              "Pending" && (
+                              <Tooltip title="Edit employee">
+                                <IconButton
+                                  color="primary"
+                                  onClick={() =>
+                                    handleOpenEditDialog(
+                                      employee
+                                    )
+                                  }
+                                >
+                                  <EditIcon />
+                                </IconButton>
                               </Tooltip>
+                            )}
 
-                              <Tooltip title="Reject employee">
-                                <span>
-                                  <IconButton
-                                    color="error"
-                                    onClick={() =>
-                                      handleReject(
+                            {/* APPROVE / REJECT */}
+                            {employee.approval_status ===
+                              "Pending" && (
+                              <>
+                                <Tooltip title="Approve employee">
+                                  <span>
+                                    <IconButton
+                                      color="success"
+                                      onClick={() =>
+                                        handleApprove(
+                                          employee.id
+                                        )
+                                      }
+                                      disabled={
+                                        processingId ===
                                         employee.id
-                                      )
-                                    }
-                                    disabled={
-                                      processingId ===
-                                      employee.id
-                                    }
-                                  >
-                                    <CloseIcon />
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            </Box>
-                          )}
+                                      }
+                                    >
+                                      {processingId ===
+                                      employee.id ? (
+                                        <CircularProgress
+                                          size={22}
+                                        />
+                                      ) : (
+                                        <CheckIcon />
+                                      )}
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
 
-                          {employee.approval_status !==
-                            "Pending" && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              —
-                            </Typography>
-                          )}
+                                <Tooltip title="Reject employee">
+                                  <span>
+                                    <IconButton
+                                      color="error"
+                                      onClick={() =>
+                                        handleReject(
+                                          employee.id
+                                        )
+                                      }
+                                      disabled={
+                                        processingId ===
+                                        employee.id
+                                      }
+                                    >
+                                      <CloseIcon />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              </>
+
+                            )}
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))
@@ -619,6 +753,103 @@ function EmployeeList() {
             </Button>
           </DialogActions>
         </Box>
+      </Dialog>
+
+      {/* EDIT EMPLOYEE / RESTAURANT DIALOG */}
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleCloseEditDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle fontWeight="bold">
+          Edit Employee
+        </DialogTitle>
+
+        <DialogContent>
+          {editingEmployee && (
+            <>
+              <Typography
+                variant="body1"
+                fontWeight="bold"
+                sx={{ mb: 1 }}
+              >
+                {editingEmployee.first_name}{" "}
+                {editingEmployee.last_name}
+              </Typography>
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 3 }}
+              >
+                Employee ID:{" "}
+                {editingEmployee.employee_id || "-"}
+              </Typography>
+
+              <FormControl
+                fullWidth
+                margin="normal"
+              >
+                <InputLabel>
+                  Restaurant
+                </InputLabel>
+
+                <Select
+                  label="Restaurant"
+                  value={editRestaurantId}
+                  onChange={(event) =>
+                    setEditRestaurantId(
+                      event.target.value
+                    )
+                  }
+                >
+                  <MenuItem value="">
+                    <em>Not assigned</em>
+                  </MenuItem>
+
+                  {restaurants.map((restaurant) => (
+                    <MenuItem
+                      key={restaurant.id}
+                      value={String(restaurant.id)}
+                    >
+                      {restaurant.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 3,
+          }}
+        >
+          <Button
+            onClick={handleCloseEditDialog}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={handleUpdateEmployee}
+            disabled={saving}
+          >
+            {saving ? (
+              <CircularProgress
+                size={24}
+                color="inherit"
+              />
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* SUCCESS MESSAGE */}

@@ -25,3 +25,12 @@ export const rejectEmployee = async (employeeId) => {
 
   return response.data;
 };
+
+export const updateEmployee = async (employeeId, employeeData) => {
+  const response = await api.put(
+    `/employees/${employeeId}`,
+    employeeData
+  );
+
+  return response.data;
+};
