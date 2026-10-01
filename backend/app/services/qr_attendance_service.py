@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -8,25 +9,45 @@ from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 
 
+RIGA_TIMEZONE = ZoneInfo("Europe/Riga")
+
+
 def utc_now():
     """
     Return the current UTC time.
 
     The value is intentionally timezone-naive because
-    SQLite stores the attendance timestamps as naive
+    SQLite stores attendance timestamps as naive
     datetime values.
     """
     return datetime.utcnow()
 
 
-def check_in(
-    restaurant_id: int,
+def get_riga_date(utc_datetime):
+    """
+    Convert a naive UTC datetime to the local Riga date.
+
+    This allows an overnight shift to keep the work_date
+    of the day on which the employee checked in.
+    """
+
+    if utc_datetime.tzinfo is None:
+        utc_datetime = utc_datetime.replace(
+            tzinfo=timezone.utc
+        )
+
+    return utc_datetime.astimezone(
+        RIGA_TIMEZONE
+    ).date()
+
+
+def get_employee(
     current_user: dict,
     db: Session
 ):
-    # ============================================================
-    # FIND EMPLOYEE FROM JWT
-    # ============================================================
+    """
+    Find the employee associated with the JWT.
+    """
 
     employee = (
         db.query(Employee)
@@ -42,9 +63,16 @@ def check_in(
             detail="Employee not found"
         )
 
-    # ============================================================
-    # CHECK RESTAURANT
-    # ============================================================
+    return employee
+
+
+def get_restaurant(
+    restaurant_id: int,
+    db: Session
+):
+    """
+    Find the restaurant.
+    """
 
     restaurant = (
         db.query(Restaurant)
@@ -60,9 +88,17 @@ def check_in(
             detail="Restaurant not found"
         )
 
-    # ============================================================
-    # CHECK EMPLOYEE RESTAURANT ASSIGNMENT
-    # ============================================================
+    return restaurant
+
+
+def check_restaurant_assignment(
+    employee,
+    restaurant_id: int
+):
+    """
+    Make sure the employee is assigned
+    to the restaurant being scanned.
+    """
 
     if employee.restaurant_id != restaurant_id:
         raise HTTPException(
@@ -70,36 +106,94 @@ def check_in(
             detail="Employee is not assigned to this restaurant"
         )
 
+
+def check_in(
+    restaurant_id: int,
+    current_user: dict,
+    db: Session
+):
     # ============================================================
-    # CHECK IF ALREADY CHECKED IN TODAY
+    # FIND EMPLOYEE
     # ============================================================
 
-    attendance = (
+    employee = get_employee(
+        current_user,
+        db
+    )
+
+    # ============================================================
+    # CHECK RESTAURANT
+    # ============================================================
+
+    get_restaurant(
+        restaurant_id,
+        db
+    )
+
+    # ============================================================
+    # CHECK EMPLOYEE RESTAURANT ASSIGNMENT
+    # ============================================================
+
+    check_restaurant_assignment(
+        employee,
+        restaurant_id
+    )
+
+    # ============================================================
+    # CHECK FOR AN OPEN SHIFT
+    #
+    # We no longer check work_date.
+    #
+    # This is important because:
+    #
+    # Oct 1 19:00 -> check in
+    # Oct 2 03:00 -> check out
+    #
+    # The attendance record is still open during the
+    # night even though the calendar date has changed.
+    # ============================================================
+
+    open_attendance = (
         db.query(Attendance)
         .filter(
             Attendance.employee_id == employee.id,
-            Attendance.work_date == date.today()
+            Attendance.check_out.is_(None)
+        )
+        .order_by(
+            Attendance.check_in.desc()
         )
         .first()
     )
 
-    if attendance:
+    if open_attendance:
         raise HTTPException(
             status_code=400,
-            detail="Already checked in today"
+            detail="You are already checked in"
         )
 
     # ============================================================
-    # CREATE ATTENDANCE RECORD
+    # CREATE NEW SHIFT
     # ============================================================
+
+    check_in_time = utc_now()
 
     attendance = Attendance(
         employee_id=employee.id,
-        work_date=date.today(),
-        check_in=utc_now(),
-        status="Present",
+
+        # Store the local Riga date of the check-in.
+        # This remains the shift's work date even if
+        # checkout happens after midnight.
+        work_date=get_riga_date(
+            check_in_time
+        ),
+
+        check_in=check_in_time,
+        check_out=None,
+
         worked_minutes=0,
-        worked_hours=0
+        worked_hours=0,
+
+        status="Present"
     )
 
     db.add(attendance)
@@ -115,60 +209,50 @@ def check_out(
     db: Session
 ):
     # ============================================================
-    # FIND EMPLOYEE FROM JWT
+    # FIND EMPLOYEE
     # ============================================================
 
-    employee = (
-        db.query(Employee)
-        .filter(
-            Employee.email == current_user["sub"]
-        )
-        .first()
+    employee = get_employee(
+        current_user,
+        db
     )
-
-    if employee is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Employee not found"
-        )
 
     # ============================================================
     # CHECK RESTAURANT
     # ============================================================
 
-    restaurant = (
-        db.query(Restaurant)
-        .filter(
-            Restaurant.id == restaurant_id
-        )
-        .first()
+    get_restaurant(
+        restaurant_id,
+        db
     )
-
-    if restaurant is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found"
-        )
 
     # ============================================================
     # CHECK EMPLOYEE RESTAURANT ASSIGNMENT
     # ============================================================
 
-    if employee.restaurant_id != restaurant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Employee is not assigned to this restaurant"
-        )
+    check_restaurant_assignment(
+        employee,
+        restaurant_id
+    )
 
     # ============================================================
-    # FIND TODAY'S ATTENDANCE
+    # FIND CURRENT OPEN SHIFT
+    #
+    # IMPORTANT:
+    # We search for an attendance record with no checkout
+    # instead of searching only today's date.
+    #
+    # This supports overnight shifts.
     # ============================================================
 
     attendance = (
         db.query(Attendance)
         .filter(
             Attendance.employee_id == employee.id,
-            Attendance.work_date == date.today()
+            Attendance.check_out.is_(None)
+        )
+        .order_by(
+            Attendance.check_in.desc()
         )
         .first()
     )
@@ -176,27 +260,11 @@ def check_out(
     if attendance is None:
         raise HTTPException(
             status_code=404,
-            detail="You have not checked in today"
+            detail="You do not have an active shift"
         )
 
     # ============================================================
-    # PREVENT DOUBLE CHECKOUT
-    # ============================================================
-
-    if attendance.check_out is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Already checked out"
-        )
-
-    # ============================================================
-    # SAVE CHECKOUT TIME
-    # ============================================================
-
-    attendance.check_out = utc_now()
-
-    # ============================================================
-    # CALCULATE WORKED TIME
+    # PREVENT INVALID ATTENDANCE DATA
     # ============================================================
 
     if attendance.check_in is None:
@@ -205,8 +273,29 @@ def check_out(
             detail="Attendance record has no check-in time"
         )
 
+    # ============================================================
+    # SAVE CHECKOUT TIME
+    # ============================================================
+
+    check_out_time = utc_now()
+
+    attendance.check_out = check_out_time
+
+    # ============================================================
+    # CALCULATE WORKED TIME
+    #
+    # This naturally works across midnight.
+    #
+    # Example:
+    #
+    # Oct 1 19:00
+    # Oct 2 03:00
+    #
+    # = 8 hours
+    # ============================================================
+
     time_difference = (
-        attendance.check_out -
+        check_out_time -
         attendance.check_in
     )
 

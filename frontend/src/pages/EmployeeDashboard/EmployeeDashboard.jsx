@@ -186,15 +186,24 @@ function EmployeeDashboard() {
         return;
       }
 
-      const today = new Date()
-        .toISOString()
-        .split("T")[0];
+const openRecord = records.find(
+  (record) => !record.check_out
+);
 
-      const todayRecord = records.find(
-        (record) => record.work_date === today
-      );
+if (openRecord) {
+  setAttendance(openRecord);
+  return;
+}
 
-      setAttendance(todayRecord || null);
+const sortedRecords = [...records].sort(
+  (a, b) =>
+    new Date(b.check_in) -
+    new Date(a.check_in)
+);
+
+setAttendance(
+  sortedRecords[0] || null
+);
     } catch (err) {
       console.error(err);
 
@@ -423,7 +432,7 @@ function EmployeeDashboard() {
     /*
      * No attendance today -> CHECK IN
      */
-    if (!attendance) {
+    if (!attendance || attendance.check_out) {
       setProcessing(true);
       setError("");
 
@@ -861,7 +870,7 @@ function EmployeeDashboard() {
               </Typography>
 
               {/* QR SCANNER BUTTON */}
-              {!isCheckedOut && (
+              {!processing && (
                 <Button
                   variant="contained"
                   size="large"
