@@ -10,67 +10,53 @@ import EmployeeList from "../pages/Employees/EmployeeList";
 import Register from "../pages/Register/Register";
 import EmployeeDashboard from "../pages/EmployeeDashboard/EmployeeDashboard";
 import EmployeeAttendance from "../pages/EmployeeAttendance/EmployeeAttendance";
+import EmployeeProfile from "../pages/EmployeeProfile/EmployeeProfile";
 import RestaurantManagement from "../pages/Restaurants/RestaurantManagement";
 import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
 import Reports from "../pages/Reports/Reports";
 
-
 function AppRoutes() {
   return (
     <BrowserRouter>
-
       <Routes>
 
         {/* Login */}
-
         <Route
           path="/"
           element={<Login />}
         />
 
-
         {/* Manager Dashboard */}
-
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-
         {/* Employees */}
-
         <Route
           path="/employees"
           element={<EmployeeList />}
         />
 
-
         {/* Manager Attendance */}
-
         <Route
           path="/manager-attendance"
           element={<ManagerAttendance />}
         />
 
-
         {/* Restaurants */}
-
         <Route
           path="/restaurants"
           element={<RestaurantManagement />}
         />
 
-
         {/* Reports */}
-
         <Route
           path="/reports"
           element={<Reports />}
         />
 
-
         {/* Settings */}
-
         <Route
           path="/settings"
           element={
@@ -83,35 +69,33 @@ function AppRoutes() {
           }
         />
 
-
         {/* Employee Registration */}
-
         <Route
           path="/register"
           element={<Register />}
         />
 
-
         {/* Employee Dashboard */}
-
         <Route
           path="/employee-dashboard"
           element={<EmployeeDashboard />}
         />
 
-
         {/* Employee Attendance */}
-
         <Route
           path="/employee-attendance"
           element={<EmployeeAttendance />}
         />
 
-      </Routes>
+        {/* Employee Profile */}
+        <Route
+          path="/employee-profile"
+          element={<EmployeeProfile />}
+        />
 
+      </Routes>
     </BrowserRouter>
   );
 }
-
 
 export default AppRoutes;

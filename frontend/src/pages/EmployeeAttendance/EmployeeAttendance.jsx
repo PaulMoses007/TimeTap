@@ -41,6 +41,7 @@ function EmployeeAttendance() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -89,6 +90,17 @@ function EmployeeAttendance() {
     loadHistory();
   }, [navigate]);
 
+    // Update the clock every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem(
       "access_token"
@@ -114,30 +126,85 @@ function EmployeeAttendance() {
     );
   };
 
-  const formatTime = (value) => {
-    if (!value) {
-      return "-";
-    }
+const parseBackendUtc = (value) => {
+  if (!value) {
+    return null;
+  }
 
-    return new Date(value).toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
-  };
+  if (
+    typeof value === "string" &&
+    !value.endsWith("Z") &&
+    !/[+-]\d{2}:\d{2}$/.test(value)
+  ) {
+    return new Date(`${value}Z`);
+  }
 
-  const formatHours = (record) => {
-    if (
-      record.worked_hours === null ||
-      record.worked_hours === undefined
-    ) {
-      return "-";
-    }
+  return new Date(value);
+};
 
-    return `${record.worked_hours} hrs`;
-  };
+const formatTime = (value) => {
+  const date = parseBackendUtc(value);
+
+  if (!date) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Riga",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+};
+
+const formatLiveTime = () => {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Riga",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(currentTime);
+};
+
+const formatWorkedTime = (record) => {
+  if (!record?.check_in) {
+    return "-";
+  }
+
+  if (record.check_out) {
+    return `${record.worked_hours ?? 0} hrs`;
+  }
+
+  const checkIn = parseBackendUtc(record.check_in);
+
+  if (!checkIn) {
+    return "-";
+  }
+
+  const seconds = Math.max(
+    0,
+    Math.floor(
+      (currentTime.getTime() - checkIn.getTime()) / 1000
+    )
+  );
+
+  const hours = Math.floor(seconds / 3600);
+
+  const minutes = Math.floor(
+    (seconds % 3600) / 60
+  );
+
+  const remainingSeconds = seconds % 60;
+
+  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(
+    remainingSeconds
+  ).padStart(2, "0")}s`;
+};
+
+const formatHours = (record) => {
+  return formatWorkedTime(record);
+};
 
   const getStatusColor = (status) => {
     if (status === "Present") {
@@ -366,6 +433,14 @@ function EmployeeAttendance() {
               View your previous attendance
               records and worked hours.
             </Typography>
+
+            <Typography
+              color="primary"
+              fontWeight="bold"
+              sx={{ mt: 1 }}
+            >
+              Riga Time: {formatLiveTime()}
+            </Typography>
           </Box>
 
           {error && (
@@ -453,14 +528,34 @@ function EmployeeAttendance() {
                         </TableCell>
 
                         <TableCell>
-                          {formatTime(
-                            record.check_out
-                          )}
+                          {record.check_out
+                            ? formatTime(record.check_out)
+                            : `Working — ${formatLiveTime()}`}
                         </TableCell>
 
                         <TableCell>
-                          {record.worked_minutes ??
-                            0}
+                          {record.check_out
+                            ? (record.worked_minutes ?? 0)
+                            : (() => {
+                                const checkIn =
+                                  parseBackendUtc(
+                                    record.check_in
+                                  );
+
+                                if (!checkIn) {
+                                  return 0;
+                                }
+
+                                return Math.max(
+                                  0,
+                                  Math.floor(
+                                    (
+                                      currentTime.getTime() -
+                                      checkIn.getTime()
+                                    ) / 60000
+                                  )
+                                );
+                              })()}
                         </TableCell>
 
                         <TableCell>

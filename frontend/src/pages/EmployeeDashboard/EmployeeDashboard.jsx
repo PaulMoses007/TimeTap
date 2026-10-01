@@ -168,12 +168,26 @@ function EmployeeDashboard() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
+  // Live Riga time shown on the dashboard.
+  const [currentTime, setCurrentTime] = useState(new Date());
+
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannedData, setScannedData] = useState("");
   const [scannerError, setScannerError] = useState("");
+
+  // Keep the dashboard clock updated every second.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
 
   const loadAttendance = async () => {
     try {
@@ -589,20 +603,35 @@ setAttendance(
 
     window.location.href = "/";
   };
+const parseBackendUtc = (value) => {
+  if (!value) {
+    return null;
+  }
 
-  const formatTime = (value) => {
-    if (!value) {
-      return "-";
-    }
+  if (
+    typeof value === "string" &&
+    !value.endsWith("Z") &&
+    !/[+-]\d{2}:\d{2}$/.test(value)
+  ) {
+    return new Date(`${value}Z`);
+  }
 
-    return new Date(value).toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    );
-  };
+  return new Date(value);
+};
+const formatTime = (value) => {
+  const date = parseBackendUtc(value);
+
+  if (!date) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Riga",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+};
 
   if (loading) {
     return (
@@ -626,6 +655,54 @@ setAttendance(
   const isCheckedOut =
     attendance &&
     attendance.check_out;
+
+  // Show the live current time while a shift is open.
+  const liveCheckOutTime = isWorking
+    ? new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Riga",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(currentTime)
+    : formatTime(attendance?.check_out);
+
+  // Calculate live worked time while the employee is working.
+  const getWorkedHoursDisplay = () => {
+    if (!attendance?.check_in) {
+      return "0 hrs";
+    }
+
+    // After checkout, show the saved attendance value.
+    if (attendance.check_out) {
+      return `${attendance.worked_hours ?? 0} hrs`;
+    }
+
+const checkInTime = parseBackendUtc(
+  attendance.check_in
+);
+
+const now = new Date();
+
+    const workedSeconds = Math.max(
+      0,
+      Math.floor(
+        (now.getTime() - checkInTime.getTime()) / 1000
+      )
+    );
+
+    const hours = Math.floor(workedSeconds / 3600);
+
+    const minutes = Math.floor(
+      (workedSeconds % 3600) / 60
+    );
+
+    const seconds = workedSeconds % 60;
+
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(
+      seconds
+    ).padStart(2, "0")}s`;
+  };
 
   return (
     <Box
@@ -742,22 +819,23 @@ setAttendance(
             />
           </ListItemButton>
 
-          <ListItemButton
-            sx={{
-              borderRadius: 2,
-              mb: 0.5,
-            }}
-          >
-            <ListItemIcon
-              sx={{ minWidth: 42 }}
-            >
-              <PersonIcon />
-            </ListItemIcon>
+<ListItemButton
+  onClick={() => navigate("/employee-profile")}
+  sx={{
+    borderRadius: 2,
+    mb: 0.5,
+  }}
+>
+  <ListItemIcon
+    sx={{ minWidth: 42 }}
+  >
+    <PersonIcon />
+  </ListItemIcon>
 
-            <ListItemText
-              primary="My Profile"
-            />
-          </ListItemButton>
+  <ListItemText
+    primary="My Profile"
+  />
+</ListItemButton>
         </List>
 
         <Box
@@ -823,6 +901,21 @@ setAttendance(
               Manage your attendance and
               work time.
             </Typography>
+
+            <Typography
+              color="primary"
+              fontWeight="bold"
+              sx={{ mt: 1 }}
+            >
+              Riga Time:{" "}
+              {new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Europe/Riga",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: false,
+              }).format(currentTime)}
+            </Typography>
           </Box>
 
           {error && (
@@ -855,7 +948,7 @@ setAttendance(
                 fontWeight="bold"
                 sx={{ mb: 1 }}
               >
-                Today's Attendance
+                Current Shift
               </Typography>
 
               <Typography
@@ -899,7 +992,7 @@ setAttendance(
               )}
 
               {/* NORMAL CHECK IN */}
-              {!attendance && (
+              {!isWorking && (
                 <Box>
                   <Button
                     variant="outlined"
@@ -1137,9 +1230,7 @@ setAttendance(
                   fontWeight="bold"
                   sx={{ mt: 1 }}
                 >
-                  {formatTime(
-                    attendance?.check_out
-                  )}
+                  {liveCheckOutTime}
                 </Typography>
               </CardContent>
             </Card>
@@ -1166,9 +1257,7 @@ setAttendance(
                   fontWeight="bold"
                   sx={{ mt: 1 }}
                 >
-                  {attendance?.worked_hours ??
-                    0}{" "}
-                  hrs
+                  {getWorkedHoursDisplay()}
                 </Typography>
               </CardContent>
             </Card>
