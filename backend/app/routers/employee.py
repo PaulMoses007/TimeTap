@@ -187,6 +187,36 @@ def reject_employee(
 
 
 # --------------------------------------------------
+# Get Current Logged-in Employee
+# --------------------------------------------------
+
+@router.get(
+    "/me",
+    response_model=EmployeeResponse
+)
+def get_current_employee(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+
+    employee = (
+        db.query(Employee)
+        .filter(
+            Employee.id == current_user["id"]
+        )
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Current employee not found"
+        )
+
+    return employee
+
+
+# --------------------------------------------------
 # Get Single Employee
 # --------------------------------------------------
 

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import {
   Alert,
@@ -9,35 +8,21 @@ import {
   CardContent,
   CircularProgress,
   Container,
-  Divider,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Grid,
   Typography,
 } from "@mui/material";
 
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import PeopleIcon from "@mui/icons-material/People";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import SettingsIcon from "@mui/icons-material/Settings";
-import LogoutIcon from "@mui/icons-material/Logout";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import GroupsIcon from "@mui/icons-material/Groups";
 
 import { getDashboard } from "../../services/dashboardService";
-
-const drawerWidth = 240;
+import ManagerSidebar from "../../components/ManagerSidebar";
 
 function Dashboard() {
-  const navigate = useNavigate();
-
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,11 +47,6 @@ function Dashboard() {
     loadDashboard();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    window.location.href = "/";
-  };
-
   if (loading) {
     return (
       <Box
@@ -85,49 +65,12 @@ function Dashboard() {
   if (error) {
     return (
       <Container sx={{ mt: 5 }}>
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error">
+          {error}
+        </Alert>
       </Container>
     );
   }
-
-  const menuItems = [
-    {
-      text: "Dashboard",
-      icon: <DashboardIcon />,
-      active: true,
-      path: "/dashboard",
-    },
-    {
-      text: "Employees",
-      icon: <PeopleIcon />,
-      active: false,
-      path: "/employees",
-    },
-    {
-      text: "Attendance",
-      icon: <AccessTimeIcon />,
-      active: false,
-      path: "/manager-attendance",
-    },
-    {
-      text: "Restaurants",
-      icon: <RestaurantIcon />,
-      active: false,
-      path: "/restaurants",
-    },
-    {
-      text: "Reports",
-      icon: <AssessmentIcon />,
-      active: false,
-      path: "/reports",
-    },
-    {
-      text: "Settings",
-      icon: <SettingsIcon />,
-      active: false,
-      path: "/settings",
-    },
-  ];
 
   const cards = [
     {
@@ -175,124 +118,8 @@ function Dashboard() {
         minHeight: "100vh",
       }}
     >
-      {/* SIDEBAR */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-
-          "& .MuiDrawer-paper": {
-            width: drawerWidth,
-            boxSizing: "border-box",
-            borderRight: "1px solid #e0e0e0",
-          },
-        }}
-      >
-        {/* LOGO */}
-        <Box
-          sx={{
-            height: 80,
-            display: "flex",
-            alignItems: "center",
-            px: 3,
-          }}
-        >
-          <Avatar
-            sx={{
-              mr: 1.5,
-              bgcolor: "primary.main",
-            }}
-          >
-            <AccessTimeIcon />
-          </Avatar>
-
-          <Typography
-            variant="h5"
-            fontWeight="bold"
-            color="primary"
-          >
-            TimeTap
-          </Typography>
-        </Box>
-
-        <Divider />
-
-        {/* USER INFORMATION */}
-        <Box
-          sx={{
-            px: 2,
-            py: 3,
-          }}
-        >
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            Logged in as
-          </Typography>
-
-          <Typography
-            variant="subtitle1"
-            fontWeight="bold"
-          >
-            Manager
-          </Typography>
-        </Box>
-
-        {/* NAVIGATION */}
-        <List sx={{ px: 1 }}>
-          {menuItems.map((item) => (
-            <ListItemButton
-              key={item.text}
-              selected={item.active}
-              onClick={() => navigate(item.path)}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: 42,
-                  color: item.active
-                    ? "primary.main"
-                    : "text.secondary",
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-
-              <ListItemText
-                primary={item.text}
-              />
-            </ListItemButton>
-          ))}
-        </List>
-
-        {/* LOGOUT */}
-        <Box
-          sx={{
-            mt: "auto",
-            p: 1,
-          }}
-        >
-          <Divider sx={{ mb: 1 }} />
-
-          <ListItemButton
-            onClick={handleLogout}
-            sx={{
-              borderRadius: 2,
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 42 }}>
-              <LogoutIcon />
-            </ListItemIcon>
-
-            <ListItemText primary="Logout" />
-          </ListItemButton>
-        </Box>
-      </Drawer>
+      {/* COMMON MANAGER SIDEBAR */}
+      <ManagerSidebar activePage="dashboard" />
 
       {/* MAIN CONTENT */}
       <Box

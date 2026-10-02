@@ -20,14 +20,9 @@ import {
   Typography,
 } from "@mui/material";
 
-import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import RestaurantIcon from "@mui/icons-material/Restaurant";
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import SettingsIcon from "@mui/icons-material/Settings";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import LogoutIcon from "@mui/icons-material/Logout";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import WarningIcon from "@mui/icons-material/Warning";
@@ -48,6 +43,8 @@ import {
 } from "recharts";
 
 import api from "../../api/axios";
+
+import ManagerSidebar from "../../components/ManagerSidebar";
 
 
 function Reports() {
@@ -113,55 +110,6 @@ function Reports() {
   useEffect(() => {
     loadAnalytics();
   }, []);
-
-
-  // ============================================================
-  // LOGOUT
-  // ============================================================
-
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    navigate("/");
-  };
-
-
-  // ============================================================
-  // SIDEBAR
-  // ============================================================
-
-  const menuItems = [
-    {
-      text: "Dashboard",
-      icon: <DashboardIcon />,
-      path: "/dashboard",
-    },
-    {
-      text: "Employees",
-      icon: <PeopleIcon />,
-      path: "/employees",
-    },
-    {
-      text: "Attendance",
-      icon: <AccessTimeIcon />,
-      path: "/manager-attendance",
-    },
-    {
-      text: "Restaurants",
-      icon: <RestaurantIcon />,
-      path: "/restaurants",
-    },
-    {
-      text: "Reports",
-      icon: <AssessmentIcon />,
-      path: "/reports",
-      active: true,
-    },
-    {
-      text: "Settings",
-      icon: <SettingsIcon />,
-      path: "/settings",
-    },
-  ];
 
 
   // ============================================================
@@ -362,106 +310,8 @@ function Reports() {
       }}
     >
 
-      {/* ====================================================== */}
-      {/* SIDEBAR */}
-      {/* ====================================================== */}
-
-      <Box
-        sx={{
-          width: 250,
-          backgroundColor: "#ffffff",
-          borderRight: "1px solid #e0e0e0",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-
-        <Box
-          sx={{
-            padding: 3,
-            borderBottom: "1px solid #e0e0e0",
-          }}
-        >
-          <Typography
-            variant="h5"
-            fontWeight="bold"
-            color="primary"
-          >
-            TimeTap
-          </Typography>
-
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            Manager Panel
-          </Typography>
-        </Box>
-
-
-        <Box
-          sx={{
-            padding: 2,
-            flexGrow: 1,
-          }}
-        >
-
-          {menuItems.map((item) => (
-            <Button
-              key={item.text}
-              fullWidth
-              startIcon={item.icon}
-              onClick={() => navigate(item.path)}
-              sx={{
-                justifyContent: "flex-start",
-                padding: "12px 16px",
-                marginBottom: 1,
-                borderRadius: 2,
-
-                color: item.active
-                  ? "primary.main"
-                  : "text.secondary",
-
-                backgroundColor: item.active
-                  ? "rgba(25, 118, 210, 0.08)"
-                  : "transparent",
-
-                fontWeight: item.active
-                  ? "bold"
-                  : "normal",
-
-                "&:hover": {
-                  backgroundColor:
-                    "rgba(25, 118, 210, 0.08)",
-                },
-              }}
-            >
-              {item.text}
-            </Button>
-          ))}
-
-        </Box>
-
-
-        <Box sx={{ padding: 2 }}>
-
-          <Button
-            fullWidth
-            startIcon={<LogoutIcon />}
-            onClick={logout}
-            sx={{
-              justifyContent: "flex-start",
-              padding: "12px 16px",
-              color: "error.main",
-            }}
-          >
-            Logout
-          </Button>
-
-        </Box>
-
-      </Box>
-
+      {/* COMMON MANAGER SIDEBAR */}
+      <ManagerSidebar activePage="reports" />
 
       {/* ====================================================== */}
       {/* MAIN CONTENT */}
