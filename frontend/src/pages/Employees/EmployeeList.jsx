@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   Alert,
@@ -6,6 +7,13 @@ import {
   Button,
   Card,
   CardContent,
+  Avatar,
+  Divider,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Chip,
   CircularProgress,
   Dialog,
@@ -33,6 +41,13 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import PeopleIcon from "@mui/icons-material/People";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import RestaurantIcon from "@mui/icons-material/Restaurant";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import SettingsIcon from "@mui/icons-material/Settings";
+import LogoutIcon from "@mui/icons-material/Logout";
 
 import {
   createEmployee,
@@ -44,7 +59,10 @@ import {
 
 import { getRestaurants } from "../../services/restaurantService";
 
+const drawerWidth = 300;
+
 function EmployeeList() {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
 
@@ -302,6 +320,11 @@ function EmployeeList() {
     return restaurant?.name || "Not assigned";
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    navigate("/");
+  };
+
   const getApprovalColor = (status) => {
     if (status === "Approved") {
       return "success";
@@ -332,16 +355,195 @@ function EmployeeList() {
   return (
     <Box
       sx={{
+        display: "flex",
         minHeight: "100vh",
-        bgcolor: "#f7f8fa",
-        py: 4,
-        px: {
-          xs: 2,
-          md: 4,
-        },
       }}
     >
-      <Box sx={{ maxWidth: 1400, mx: "auto" }}>
+      {/* MANAGER SIDEBAR */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            borderRight: "1px solid #e0e0e0",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            height: 80,
+            display: "flex",
+            alignItems: "center",
+            px: 3,
+          }}
+        >
+          <Avatar
+            sx={{
+              mr: 1.5,
+              bgcolor: "primary.main",
+            }}
+          >
+            <AccessTimeIcon />
+          </Avatar>
+
+          <Typography
+            variant="h5"
+            fontWeight="bold"
+            color="primary"
+          >
+            TimeTap
+          </Typography>
+        </Box>
+
+        <Divider />
+
+        <Box
+          sx={{
+            px: 2,
+            py: 3,
+          }}
+        >
+          <Typography
+            variant="body2"
+            color="text.secondary"
+          >
+            Logged in as
+          </Typography>
+
+          <Typography
+            variant="subtitle1"
+            fontWeight="bold"
+          >
+            Manager
+          </Typography>
+        </Box>
+
+        <List sx={{ px: 1 }}>
+          <ListItemButton
+            onClick={() => navigate("/dashboard")}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <DashboardIcon />
+            </ListItemIcon>
+            <ListItemText primary="Dashboard" />
+          </ListItemButton>
+
+          <ListItemButton
+            selected
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: 42,
+                color: "primary.main",
+              }}
+            >
+              <PeopleIcon />
+            </ListItemIcon>
+            <ListItemText primary="Employees" />
+          </ListItemButton>
+
+          <ListItemButton
+            onClick={() => navigate("/manager-attendance")}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <AccessTimeIcon />
+            </ListItemIcon>
+            <ListItemText primary="Attendance" />
+          </ListItemButton>
+
+          <ListItemButton
+            onClick={() => navigate("/restaurants")}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <RestaurantIcon />
+            </ListItemIcon>
+            <ListItemText primary="Restaurants" />
+          </ListItemButton>
+
+          <ListItemButton
+            onClick={() => navigate("/reports")}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <AssessmentIcon />
+            </ListItemIcon>
+            <ListItemText primary="Reports" />
+          </ListItemButton>
+
+          <ListItemButton
+            onClick={() => navigate("/settings")}
+            sx={{
+              borderRadius: 2,
+              mb: 0.5,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Settings" />
+          </ListItemButton>
+        </List>
+
+        <Box
+          sx={{
+            mt: "auto",
+            p: 1,
+          }}
+        >
+          <Divider sx={{ mb: 1 }} />
+
+          <ListItemButton
+            onClick={handleLogout}
+            sx={{
+              borderRadius: 2,
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 42 }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItemButton>
+        </Box>
+      </Drawer>
+
+      {/* MAIN CONTENT */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          bgcolor: "#f7f8fa",
+          minHeight: "100vh",
+          py: 4,
+          px: {
+            xs: 2,
+            md: 4,
+          },
+        }}
+      >
+        <Box sx={{ maxWidth: 1400, mx: "auto" }}>
         {/* HEADER */}
         <Box
           sx={{
@@ -859,7 +1061,8 @@ function EmployeeList() {
         onClose={() => setSuccessMessage("")}
         message={successMessage}
       />
-    </Box>
+      </Box>
+      </Box>
   );
 }
 

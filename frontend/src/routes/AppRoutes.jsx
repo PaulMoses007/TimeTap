@@ -14,6 +14,7 @@ import EmployeeProfile from "../pages/EmployeeProfile/EmployeeProfile";
 import RestaurantManagement from "../pages/Restaurants/RestaurantManagement";
 import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
 import Reports from "../pages/Reports/Reports";
+import Settings from "../pages/Settings/Settings";
 
 function AppRoutes() {
   return (
@@ -59,14 +60,7 @@ function AppRoutes() {
         {/* Settings */}
         <Route
           path="/settings"
-          element={
-            <div style={{ padding: "40px" }}>
-              <h2>Settings</h2>
-              <p>
-                Settings page will be added later.
-              </p>
-            </div>
-          }
+          element={<Settings />}
         />
 
         {/* Employee Registration */}
