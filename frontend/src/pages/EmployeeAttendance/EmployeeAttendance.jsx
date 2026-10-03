@@ -43,6 +43,10 @@ function EmployeeAttendance() {
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  // ==================================================
+  // LOAD ATTENDANCE HISTORY
+  // ==================================================
+
   useEffect(() => {
     const loadHistory = async () => {
       const token =
@@ -90,7 +94,10 @@ function EmployeeAttendance() {
     loadHistory();
   }, [navigate]);
 
-    // Update the clock every second
+  // ==================================================
+  // LIVE CLOCK
+  // ==================================================
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -101,6 +108,10 @@ function EmployeeAttendance() {
     };
   }, []);
 
+  // ==================================================
+  // LOGOUT
+  // ==================================================
+
   const handleLogout = () => {
     localStorage.removeItem(
       "access_token"
@@ -108,6 +119,10 @@ function EmployeeAttendance() {
 
     window.location.href = "/";
   };
+
+  // ==================================================
+  // DATE FORMAT
+  // ==================================================
 
   const formatDate = (value) => {
     if (!value) {
@@ -126,85 +141,113 @@ function EmployeeAttendance() {
     );
   };
 
-const parseBackendUtc = (value) => {
-  if (!value) {
-    return null;
-  }
+  // ==================================================
+  // BACKEND UTC PARSER
+  // ==================================================
 
-  if (
-    typeof value === "string" &&
-    !value.endsWith("Z") &&
-    !/[+-]\d{2}:\d{2}$/.test(value)
-  ) {
-    return new Date(`${value}Z`);
-  }
+  const parseBackendUtc = (value) => {
+    if (!value) {
+      return null;
+    }
 
-  return new Date(value);
-};
+    if (
+      typeof value === "string" &&
+      !value.endsWith("Z") &&
+      !/[+-]\d{2}:\d{2}$/.test(value)
+    ) {
+      return new Date(`${value}Z`);
+    }
 
-const formatTime = (value) => {
-  const date = parseBackendUtc(value);
+    return new Date(value);
+  };
 
-  if (!date) {
-    return "-";
-  }
+  // ==================================================
+  // TIME FORMAT
+  // ==================================================
 
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Riga",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-};
+  const formatTime = (value) => {
+    const date = parseBackendUtc(value);
 
-const formatLiveTime = () => {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Riga",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(currentTime);
-};
+    if (!date) {
+      return "-";
+    }
 
-const formatWorkedTime = (record) => {
-  if (!record?.check_in) {
-    return "-";
-  }
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Riga",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  };
 
-  if (record.check_out) {
-    return `${record.worked_hours ?? 0} hrs`;
-  }
+  // ==================================================
+  // LIVE RIGA TIME
+  // ==================================================
 
-  const checkIn = parseBackendUtc(record.check_in);
+  const formatLiveTime = () => {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Riga",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(currentTime);
+  };
 
-  if (!checkIn) {
-    return "-";
-  }
+  // ==================================================
+  // WORKED TIME
+  // ==================================================
 
-  const seconds = Math.max(
-    0,
-    Math.floor(
-      (currentTime.getTime() - checkIn.getTime()) / 1000
-    )
-  );
+  const formatWorkedTime = (record) => {
+    if (!record?.check_in) {
+      return "-";
+    }
 
-  const hours = Math.floor(seconds / 3600);
+    if (record.check_out) {
+      return `${record.worked_hours ?? 0} hrs`;
+    }
 
-  const minutes = Math.floor(
-    (seconds % 3600) / 60
-  );
+    const checkIn =
+      parseBackendUtc(record.check_in);
 
-  const remainingSeconds = seconds % 60;
+    if (!checkIn) {
+      return "-";
+    }
 
-  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(
-    remainingSeconds
-  ).padStart(2, "0")}s`;
-};
+    const seconds = Math.max(
+      0,
+      Math.floor(
+        (currentTime.getTime() -
+          checkIn.getTime()) /
+          1000
+      )
+    );
 
-const formatHours = (record) => {
-  return formatWorkedTime(record);
-};
+    const hours =
+      Math.floor(seconds / 3600);
+
+    const minutes =
+      Math.floor(
+        (seconds % 3600) / 60
+      );
+
+    const remainingSeconds =
+      seconds % 60;
+
+    return `${hours}h ${String(
+      minutes
+    ).padStart(2, "0")}m ${String(
+      remainingSeconds
+    ).padStart(2, "0")}s`;
+  };
+
+  const formatHours = (record) => {
+    return formatWorkedTime(record);
+  };
+
+  // ==================================================
+  // STATUS COLOR
+  // ==================================================
 
   const getStatusColor = (status) => {
     if (status === "Present") {
@@ -217,6 +260,10 @@ const formatHours = (record) => {
 
     return "default";
   };
+
+  // ==================================================
+  // LOADING
+  // ==================================================
 
   if (loading) {
     return (
@@ -233,6 +280,10 @@ const formatHours = (record) => {
     );
   }
 
+  // ==================================================
+  // PAGE
+  // ==================================================
+
   return (
     <Box
       sx={{
@@ -240,7 +291,10 @@ const formatHours = (record) => {
         minHeight: "100vh",
       }}
     >
-      {/* SIDEBAR */}
+      {/* ============================================
+          SIDEBAR
+      ============================================ */}
+
       <Drawer
         variant="permanent"
         sx={{
@@ -255,7 +309,9 @@ const formatHours = (record) => {
           },
         }}
       >
+
         {/* LOGO */}
+
         <Box
           sx={{
             height: 80,
@@ -285,6 +341,7 @@ const formatHours = (record) => {
         <Divider />
 
         {/* USER */}
+
         <Box
           sx={{
             px: 2,
@@ -307,7 +364,11 @@ const formatHours = (record) => {
         </Box>
 
         {/* MENU */}
+
         <List sx={{ px: 1 }}>
+
+          {/* DASHBOARD */}
+
           <ListItemButton
             onClick={() =>
               navigate(
@@ -330,6 +391,9 @@ const formatHours = (record) => {
             />
           </ListItemButton>
 
+
+          {/* ATTENDANCE HISTORY */}
+
           <ListItemButton
             selected
             sx={{
@@ -351,7 +415,18 @@ const formatHours = (record) => {
             />
           </ListItemButton>
 
+
+          {/* ========================================
+              MY PROFILE
+              FIXED NAVIGATION
+          ======================================== */}
+
           <ListItemButton
+            onClick={() =>
+              navigate(
+                "/employee-profile"
+              )
+            }
             sx={{
               borderRadius: 2,
               mb: 0.5,
@@ -367,9 +442,11 @@ const formatHours = (record) => {
               primary="My Profile"
             />
           </ListItemButton>
+
         </List>
 
         {/* LOGOUT */}
+
         <Box
           sx={{
             mt: "auto",
@@ -395,9 +472,14 @@ const formatHours = (record) => {
             />
           </ListItemButton>
         </Box>
+
       </Drawer>
 
-      {/* MAIN CONTENT */}
+
+      {/* ============================================
+          MAIN CONTENT
+      ============================================ */}
+
       <Box
         component="main"
         sx={{
@@ -406,6 +488,7 @@ const formatHours = (record) => {
           minHeight: "100vh",
         }}
       >
+
         <Box
           sx={{
             maxWidth: 1400,
@@ -417,8 +500,11 @@ const formatHours = (record) => {
             },
           }}
         >
+
           {/* HEADER */}
+
           <Box sx={{ mb: 4 }}>
+
             <Typography
               variant="h4"
               fontWeight="bold"
@@ -441,7 +527,11 @@ const formatHours = (record) => {
             >
               Riga Time: {formatLiveTime()}
             </Typography>
+
           </Box>
+
+
+          {/* ERROR */}
 
           {error && (
             <Alert
@@ -452,7 +542,9 @@ const formatHours = (record) => {
             </Alert>
           )}
 
-          {/* TABLE */}
+
+          {/* ATTENDANCE TABLE */}
+
           <TableContainer
             component={Paper}
             elevation={0}
@@ -463,9 +555,13 @@ const formatHours = (record) => {
               overflow: "hidden",
             }}
           >
+
             <Table>
+
               <TableHead>
+
                 <TableRow>
+
                   <TableCell>
                     <strong>Date</strong>
                   </TableCell>
@@ -479,22 +575,32 @@ const formatHours = (record) => {
                   </TableCell>
 
                   <TableCell>
-                    <strong>Worked Minutes</strong>
+                    <strong>
+                      Worked Minutes
+                    </strong>
                   </TableCell>
 
                   <TableCell>
-                    <strong>Worked Hours</strong>
+                    <strong>
+                      Worked Hours
+                    </strong>
                   </TableCell>
 
                   <TableCell>
                     <strong>Status</strong>
                   </TableCell>
+
                 </TableRow>
+
               </TableHead>
 
+
               <TableBody>
+
                 {records.length === 0 ? (
+
                   <TableRow>
+
                     <TableCell
                       colSpan={6}
                       align="center"
@@ -507,19 +613,25 @@ const formatHours = (record) => {
                         found.
                       </Typography>
                     </TableCell>
+
                   </TableRow>
+
                 ) : (
+
                   records.map(
                     (record) => (
+
                       <TableRow
                         key={record.id}
                         hover
                       >
+
                         <TableCell>
                           {formatDate(
                             record.work_date
                           )}
                         </TableCell>
+
 
                         <TableCell>
                           {formatTime(
@@ -527,16 +639,29 @@ const formatHours = (record) => {
                           )}
                         </TableCell>
 
-                        <TableCell>
-                          {record.check_out
-                            ? formatTime(record.check_out)
-                            : `Working — ${formatLiveTime()}`}
-                        </TableCell>
 
                         <TableCell>
+
                           {record.check_out
-                            ? (record.worked_minutes ?? 0)
+                            ? formatTime(
+                                record.check_out
+                              )
+                            : `Working — ${formatLiveTime()}`}
+
+                        </TableCell>
+
+
+                        <TableCell>
+
+                          {record.check_out
+
+                            ? (
+                                record.worked_minutes ??
+                                0
+                              )
+
                             : (() => {
+
                                 const checkIn =
                                   parseBackendUtc(
                                     record.check_in
@@ -555,16 +680,19 @@ const formatHours = (record) => {
                                     ) / 60000
                                   )
                                 );
+
                               })()}
+
                         </TableCell>
 
-                        <TableCell>
-                          {formatHours(
-                            record
-                          )}
-                        </TableCell>
 
                         <TableCell>
+                          {formatHours(record)}
+                        </TableCell>
+
+
+                        <TableCell>
+
                           <Chip
                             label={
                               record.status ||
@@ -575,16 +703,26 @@ const formatHours = (record) => {
                             )}
                             size="small"
                           />
+
                         </TableCell>
+
                       </TableRow>
+
                     )
                   )
+
                 )}
+
               </TableBody>
+
             </Table>
+
           </TableContainer>
+
         </Box>
+
       </Box>
+
     </Box>
   );
 }

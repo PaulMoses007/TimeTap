@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -21,72 +21,44 @@ import {
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 import { registerEmployee } from "../../services/registerService";
-import { getRestaurants } from "../../services/restaurantService";
 
 
 function Register() {
   const navigate = useNavigate();
 
-  const [restaurants, setRestaurants] = useState([]);
-  const [loadingRestaurants, setLoadingRestaurants] =
-    useState(true);
-
   const [formData, setFormData] = useState({
-    restaurant_id: "",
+    // Restaurant invitation
+    invitation_code: "",
+
+    // Personal information
     first_name: "",
     last_name: "",
     email: "",
     phone: "",
+
+    // Role
     role: "Employee",
+    custom_role: "",
 
-    // Flexible is the default
+    // Schedule
     schedule_type: "Flexible",
-
-    // Only used for Fixed schedules
     shift_start: "",
     shift_end: "",
 
+    // Authentication
     password: "",
   });
 
   const [loading, setLoading] = useState(false);
+
   const [error, setError] = useState("");
+
   const [success, setSuccess] = useState("");
 
 
-  // --------------------------------------------------
-  // Load restaurants
-  // --------------------------------------------------
-
-  useEffect(() => {
-    const loadRestaurants = async () => {
-      try {
-        const data = await getRestaurants();
-
-        setRestaurants(
-          Array.isArray(data) ? data : []
-        );
-
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err.response?.data?.detail ||
-            "Failed to load restaurants."
-        );
-
-      } finally {
-        setLoadingRestaurants(false);
-      }
-    };
-
-    loadRestaurants();
-  }, []);
-
-
-  // --------------------------------------------------
-  // Handle form changes
-  // --------------------------------------------------
+  // ==================================================
+  // HANDLE FORM CHANGES
+  // ==================================================
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -98,15 +70,36 @@ function Register() {
   };
 
 
-  // --------------------------------------------------
-  // Handle schedule type
-  // --------------------------------------------------
+  // ==================================================
+  // HANDLE ROLE CHANGE
+  // ==================================================
+
+  const handleRoleChange = (event) => {
+    const value = event.target.value;
+
+    setFormData((previous) => ({
+      ...previous,
+      role: value,
+
+      // Clear custom role when Other is not selected
+      custom_role:
+        value === "Other"
+          ? previous.custom_role
+          : "",
+    }));
+  };
+
+
+  // ==================================================
+  // HANDLE SCHEDULE TYPE
+  // ==================================================
 
   const handleScheduleTypeChange = (event) => {
     const value = event.target.value;
 
     setFormData((previous) => ({
       ...previous,
+
       schedule_type: value,
 
       // Clear times when Flexible is selected
@@ -123,9 +116,9 @@ function Register() {
   };
 
 
-  // --------------------------------------------------
-  // Submit registration
-  // --------------------------------------------------
+  // ==================================================
+  // SUBMIT REGISTRATION
+  // ==================================================
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -133,19 +126,68 @@ function Register() {
     setError("");
     setSuccess("");
 
-    // ----------------------------------------------
-    // Validate restaurant
-    // ----------------------------------------------
 
-    if (!formData.restaurant_id) {
-      setError("Please select a restaurant.");
+    // --------------------------------------------------
+    // Validate invitation code
+    // --------------------------------------------------
+
+    if (!formData.invitation_code.trim()) {
+      setError(
+        "Please enter the restaurant invitation code."
+      );
+
       return;
     }
 
 
-    // ----------------------------------------------
+    // --------------------------------------------------
+    // Validate personal information
+    // --------------------------------------------------
+
+    if (!formData.first_name.trim()) {
+      setError("Please enter your first name.");
+
+      return;
+    }
+
+    if (!formData.last_name.trim()) {
+      setError("Please enter your last name.");
+
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      setError("Please enter your email.");
+
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      setError("Please enter your phone number.");
+
+      return;
+    }
+
+
+    // --------------------------------------------------
+    // Validate custom role
+    // --------------------------------------------------
+
+    if (
+      formData.role === "Other" &&
+      !formData.custom_role.trim()
+    ) {
+      setError(
+        "Please enter your job role."
+      );
+
+      return;
+    }
+
+
+    // --------------------------------------------------
     // Validate fixed schedule
-    // ----------------------------------------------
+    // --------------------------------------------------
 
     if (
       formData.schedule_type === "Fixed" &&
@@ -157,13 +199,14 @@ function Register() {
       setError(
         "Please enter both shift start and shift end times for a fixed schedule."
       );
+
       return;
     }
 
 
-    // ----------------------------------------------
+    // --------------------------------------------------
     // Validate fixed schedule time order
-    // ----------------------------------------------
+    // --------------------------------------------------
 
     if (
       formData.schedule_type === "Fixed" &&
@@ -174,29 +217,51 @@ function Register() {
       setError(
         "Shift end time must be later than shift start time."
       );
+
       return;
     }
 
 
+    // --------------------------------------------------
+    // Prepare final role
+    // --------------------------------------------------
+
+    const finalRole =
+      formData.role === "Other"
+        ? formData.custom_role.trim()
+        : formData.role;
+
+
     setLoading(true);
+
 
     try {
 
       await registerEmployee({
-        restaurant_id: Number(
-          formData.restaurant_id
-        ),
 
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
+        // Restaurant is identified by invitation
+        invitation_code:
+          formData.invitation_code
+            .trim()
+            .toUpperCase(),
 
-        // Schedule information
-        schedule_type: formData.schedule_type,
+        first_name:
+          formData.first_name.trim(),
 
-        // Send times only for fixed schedules
+        last_name:
+          formData.last_name.trim(),
+
+        email:
+          formData.email.trim(),
+
+        phone:
+          formData.phone.trim(),
+
+        role: finalRole,
+
+        schedule_type:
+          formData.schedule_type,
+
         shift_start:
           formData.schedule_type === "Fixed"
             ? formData.shift_start
@@ -207,7 +272,8 @@ function Register() {
             ? formData.shift_end
             : null,
 
-        password: formData.password,
+        password:
+          formData.password,
       });
 
 
@@ -216,17 +282,31 @@ function Register() {
       );
 
 
+      // --------------------------------------------------
       // Reset form
+      // --------------------------------------------------
+
       setFormData({
-        restaurant_id: "",
+        invitation_code: "",
+
         first_name: "",
+
         last_name: "",
+
         email: "",
+
         phone: "",
+
         role: "Employee",
+
+        custom_role: "",
+
         schedule_type: "Flexible",
+
         shift_start: "",
+
         shift_end: "",
+
         password: "",
       });
 
@@ -236,14 +316,20 @@ function Register() {
 
       setError(
         err.response?.data?.detail ||
-          "Registration failed. Please try again."
+        "Registration failed. Please try again."
       );
 
     } finally {
+
       setLoading(false);
+
     }
   };
 
+
+  // ==================================================
+  // PAGE
+  // ==================================================
 
   return (
     <Container maxWidth="sm">
@@ -253,17 +339,19 @@ function Register() {
         sx={{
           mt: 6,
           mb: 6,
+
           p: {
             xs: 3,
             sm: 5,
           },
+
           borderRadius: 4,
         }}
       >
 
-        {/* ------------------------------------------ */}
-        {/* HEADER */}
-        {/* ------------------------------------------ */}
+        {/* ==========================================
+            HEADER
+        ========================================== */}
 
         <Box
           display="flex"
@@ -305,9 +393,9 @@ function Register() {
         </Box>
 
 
-        {/* ------------------------------------------ */}
-        {/* ERROR */}
-        {/* ------------------------------------------ */}
+        {/* ==========================================
+            ERROR
+        ========================================== */}
 
         {error && (
           <Alert
@@ -319,9 +407,9 @@ function Register() {
         )}
 
 
-        {/* ------------------------------------------ */}
-        {/* SUCCESS */}
-        {/* ------------------------------------------ */}
+        {/* ==========================================
+            SUCCESS
+        ========================================== */}
 
         {success && (
           <Alert
@@ -333,61 +421,38 @@ function Register() {
         )}
 
 
-        {/* ------------------------------------------ */}
-        {/* FORM */}
-        {/* ------------------------------------------ */}
+        {/* ==========================================
+            FORM
+        ========================================== */}
 
         <Box
           component="form"
           onSubmit={handleSubmit}
         >
 
-          {/* ---------------------------------------- */}
-          {/* RESTAURANT */}
-          {/* ---------------------------------------- */}
 
-          <FormControl
+          {/* ========================================
+              RESTAURANT INVITATION
+          ======================================== */}
+
+          <TextField
             fullWidth
             required
+            label="Restaurant Invitation Code"
+            name="invitation_code"
+            value={formData.invitation_code}
+            onChange={handleChange}
             margin="normal"
-          >
-
-            <InputLabel>
-              Restaurant
-            </InputLabel>
-
-            <Select
-              label="Restaurant"
-              name="restaurant_id"
-              value={formData.restaurant_id}
-              onChange={handleChange}
-              disabled={loadingRestaurants}
-            >
-
-              {restaurants
-                .filter(
-                  (restaurant) =>
-                    restaurant.is_active
-                )
-                .map((restaurant) => (
-
-                  <MenuItem
-                    key={restaurant.id}
-                    value={restaurant.id}
-                  >
-                    {restaurant.name}
-                  </MenuItem>
-
-                ))}
-
-            </Select>
-
-          </FormControl>
+            placeholder="TT-IMNTZ7H3"
+            helperText={
+              "Enter the invitation code provided by your restaurant manager."
+            }
+          />
 
 
-          {/* ---------------------------------------- */}
-          {/* FIRST NAME */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              FIRST NAME
+          ======================================== */}
 
           <TextField
             fullWidth
@@ -400,9 +465,9 @@ function Register() {
           />
 
 
-          {/* ---------------------------------------- */}
-          {/* LAST NAME */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              LAST NAME
+          ======================================== */}
 
           <TextField
             fullWidth
@@ -415,9 +480,9 @@ function Register() {
           />
 
 
-          {/* ---------------------------------------- */}
-          {/* EMAIL */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              EMAIL
+          ======================================== */}
 
           <TextField
             fullWidth
@@ -431,9 +496,9 @@ function Register() {
           />
 
 
-          {/* ---------------------------------------- */}
-          {/* PHONE */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              PHONE
+          ======================================== */}
 
           <TextField
             fullWidth
@@ -446,9 +511,9 @@ function Register() {
           />
 
 
-          {/* ---------------------------------------- */}
-          {/* ROLE */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              ROLE
+          ======================================== */}
 
           <FormControl
             fullWidth
@@ -464,7 +529,7 @@ function Register() {
               label="Role"
               name="role"
               value={formData.role}
-              onChange={handleChange}
+              onChange={handleRoleChange}
             >
 
               <MenuItem value="Employee">
@@ -483,14 +548,41 @@ function Register() {
                 Cashier
               </MenuItem>
 
+              <MenuItem value="Other">
+                Other
+              </MenuItem>
+
             </Select>
 
           </FormControl>
 
 
-          {/* ---------------------------------------- */}
-          {/* SCHEDULE TYPE */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              CUSTOM ROLE
+          ======================================== */}
+
+          {formData.role === "Other" && (
+
+            <TextField
+              fullWidth
+              required
+              label="Specify Your Role"
+              name="custom_role"
+              value={formData.custom_role}
+              onChange={handleChange}
+              margin="normal"
+              placeholder="Example: Pizza Maker"
+              helperText={
+                "Enter your actual job position."
+              }
+            />
+
+          )}
+
+
+          {/* ========================================
+              WORK SCHEDULE
+          ======================================== */}
 
           <Typography
             variant="subtitle1"
@@ -552,9 +644,9 @@ function Register() {
           </FormControl>
 
 
-          {/* ---------------------------------------- */}
-          {/* FIXED SCHEDULE */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              FIXED SCHEDULE
+          ======================================== */}
 
           {formData.schedule_type === "Fixed" && (
 
@@ -626,9 +718,9 @@ function Register() {
           )}
 
 
-          {/* ---------------------------------------- */}
-          {/* PASSWORD */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              PASSWORD
+          ======================================== */}
 
           <TextField
             fullWidth
@@ -642,20 +734,16 @@ function Register() {
           />
 
 
-          {/* ---------------------------------------- */}
-          {/* CREATE ACCOUNT */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              CREATE ACCOUNT
+          ======================================== */}
 
           <Button
             fullWidth
             type="submit"
             variant="contained"
             size="large"
-            disabled={
-              loading ||
-              loadingRestaurants ||
-              restaurants.length === 0
-            }
+            disabled={loading}
             sx={{
               mt: 3,
               py: 1.5,
@@ -674,9 +762,9 @@ function Register() {
           </Button>
 
 
-          {/* ---------------------------------------- */}
-          {/* LOGIN */}
-          {/* ---------------------------------------- */}
+          {/* ========================================
+              LOGIN
+          ======================================== */}
 
           <Button
             fullWidth

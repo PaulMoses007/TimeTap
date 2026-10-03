@@ -548,9 +548,8 @@ function EmployeeProfile() {
                       fontWeight="bold"
                       sx={{ mt: 0.5 }}
                     >
-                      {employee.restaurant_id
-                        ? "Chef Mezze"
-                        : "Not assigned"}
+                      {employee.restaurant_name || "Not assigned"}
+                      
                     </Typography>
                   </Box>
 

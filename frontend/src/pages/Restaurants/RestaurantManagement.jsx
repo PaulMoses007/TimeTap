@@ -23,6 +23,8 @@ import RestaurantIcon from "@mui/icons-material/Restaurant";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
 
 import {
   getRestaurants,
@@ -35,6 +37,7 @@ function RestaurantManagement() {
   const [restaurants, setRestaurants] = useState([]);
 
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState("");
 
   const [showForm, setShowForm] = useState(false);
@@ -46,15 +49,19 @@ function RestaurantManagement() {
     email: "",
   });
 
-  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] =
+    useState(false);
 
   const [selectedRestaurant, setSelectedRestaurant] =
     useState(null);
 
+  const [copiedRestaurantId, setCopiedRestaurantId] =
+    useState(null);
 
-  // --------------------------------------------------
-  // Load Restaurants
-  // --------------------------------------------------
+
+  // ==================================================
+  // LOAD RESTAURANTS
+  // ==================================================
 
   useEffect(() => {
     loadRestaurants();
@@ -64,32 +71,44 @@ function RestaurantManagement() {
   const loadRestaurants = async () => {
     try {
       setLoading(true);
+
       setError("");
 
       const data = await getRestaurants();
 
       setRestaurants(
-        Array.isArray(data) ? data : []
+        Array.isArray(data)
+          ? data
+          : []
       );
+
     } catch (err) {
+
       console.error(err);
 
       setError(
         err.response?.data?.detail ||
-          "Failed to load restaurants."
+        "Failed to load restaurants."
       );
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
 
-  // --------------------------------------------------
-  // Form Change
-  // --------------------------------------------------
+  // ==================================================
+  // FORM CHANGE
+  // ==================================================
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
+
+    const {
+      name,
+      value,
+    } = event.target;
 
     setFormData((previous) => ({
       ...previous,
@@ -98,38 +117,47 @@ function RestaurantManagement() {
   };
 
 
-  // --------------------------------------------------
-  // Create Restaurant
-  // --------------------------------------------------
+  // ==================================================
+  // CREATE RESTAURANT
+  // ==================================================
 
   const handleSubmit = async (event) => {
+
     event.preventDefault();
 
     setError("");
 
     try {
+
       const response = await fetch(
         "/api/restaurants/",
         {
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem(
-              "access_token"
-            )}`,
+            "Content-Type":
+              "application/json",
+
+            Authorization:
+              `Bearer ${localStorage.getItem(
+                "access_token"
+              )}`,
           },
 
-          body: JSON.stringify(formData),
+          body: JSON.stringify(
+            formData
+          ),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
           data.detail ||
-            "Failed to create restaurant."
+          "Failed to create restaurant."
         );
       }
 
@@ -143,39 +171,59 @@ function RestaurantManagement() {
       setShowForm(false);
 
       await loadRestaurants();
+
     } catch (err) {
+
       console.error(err);
 
       setError(
         err.message ||
-          "Failed to create restaurant."
+        "Failed to create restaurant."
       );
     }
   };
 
 
-  // --------------------------------------------------
-  // QR Code
-  // --------------------------------------------------
+  // ==================================================
+  // OPEN ATTENDANCE QR
+  // ==================================================
 
-  const handleOpenQr = (restaurant) => {
-    setSelectedRestaurant(restaurant);
+  const handleOpenQr = (
+    restaurant
+  ) => {
+
+    setSelectedRestaurant(
+      restaurant
+    );
+
     setQrDialogOpen(true);
   };
 
 
+  // ==================================================
+  // CLOSE QR
+  // ==================================================
+
   const handleCloseQr = () => {
+
     setQrDialogOpen(false);
+
     setSelectedRestaurant(null);
   };
 
 
+  // ==================================================
+  // DOWNLOAD ATTENDANCE QR
+  // ==================================================
+
   const handleDownloadQr = () => {
+
     if (!selectedRestaurant) {
       return;
     }
 
-    const link = document.createElement("a");
+    const link =
+      document.createElement("a");
 
     link.href =
       `/api/restaurants/${selectedRestaurant.id}/qr`;
@@ -191,9 +239,46 @@ function RestaurantManagement() {
   };
 
 
-  // --------------------------------------------------
-  // Main Page
-  // --------------------------------------------------
+  // ==================================================
+  // COPY INVITATION CODE
+  // ==================================================
+
+  const handleCopyInvitationCode = async (
+    restaurant
+  ) => {
+
+    if (!restaurant.invitation_code) {
+      return;
+    }
+
+    try {
+
+      await navigator.clipboard.writeText(
+        restaurant.invitation_code
+      );
+
+      setCopiedRestaurantId(
+        restaurant.id
+      );
+
+      setTimeout(() => {
+        setCopiedRestaurantId(null);
+      }, 2000);
+
+    } catch (err) {
+
+      console.error(
+        "Failed to copy invitation code:",
+        err
+      );
+
+    }
+  };
+
+
+  // ==================================================
+  // MAIN PAGE
+  // ==================================================
 
   return (
     <Box
@@ -203,18 +288,18 @@ function RestaurantManagement() {
       }}
     >
 
-      {/* ================================================== */}
-      {/* COMMON MANAGER SIDEBAR */}
-      {/* ================================================== */}
+      {/* ==================================================
+          COMMON MANAGER SIDEBAR
+      ================================================== */}
 
       <ManagerSidebar
         activePage="restaurants"
       />
 
 
-      {/* ================================================== */}
-      {/* MAIN CONTENT */}
-      {/* ================================================== */}
+      {/* ==================================================
+          MAIN CONTENT
+      ================================================== */}
 
       <Box
         component="main"
@@ -229,6 +314,7 @@ function RestaurantManagement() {
           maxWidth="xl"
           sx={{
             py: 4,
+
             px: {
               xs: 2,
               md: 4,
@@ -236,14 +322,15 @@ function RestaurantManagement() {
           }}
         >
 
-          {/* ================================================== */}
-          {/* HEADER */}
-          {/* ================================================== */}
+          {/* ==================================================
+              HEADER
+          ================================================== */}
 
           <Box
             sx={{
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent:
+                "space-between",
               alignItems: "center",
               mb: 4,
             }}
@@ -262,8 +349,8 @@ function RestaurantManagement() {
                 color="text.secondary"
                 sx={{ mt: 0.5 }}
               >
-                Manage restaurants registered in
-                TimeTap.
+                Manage restaurants
+                registered in TimeTap.
               </Typography>
 
             </Box>
@@ -282,31 +369,36 @@ function RestaurantManagement() {
           </Box>
 
 
-          {/* ================================================== */}
-          {/* ERROR */}
-          {/* ================================================== */}
+          {/* ==================================================
+              ERROR
+          ================================================== */}
 
           {error && (
+
             <Alert
               severity="error"
               sx={{ mb: 3 }}
             >
               {error}
             </Alert>
+
           )}
 
 
-          {/* ================================================== */}
-          {/* ADD RESTAURANT FORM */}
-          {/* ================================================== */}
+          {/* ==================================================
+              ADD RESTAURANT FORM
+          ================================================== */}
 
           {showForm && (
+
             <Card
               elevation={0}
               sx={{
                 mb: 4,
+
                 border:
                   "1px solid #e4e7eb",
+
                 borderRadius: 3,
               }}
             >
@@ -330,10 +422,12 @@ function RestaurantManagement() {
                   <Box
                     sx={{
                       display: "grid",
+
                       gridTemplateColumns: {
                         xs: "1fr",
                         md: "1fr 1fr",
                       },
+
                       gap: 2,
                     }}
                   >
@@ -343,24 +437,33 @@ function RestaurantManagement() {
                       label="Restaurant Name"
                       name="name"
                       value={formData.name}
-                      onChange={handleChange}
+                      onChange={
+                        handleChange
+                      }
                     />
+
 
                     <TextField
                       required
                       label="Address"
                       name="address"
                       value={formData.address}
-                      onChange={handleChange}
+                      onChange={
+                        handleChange
+                      }
                     />
+
 
                     <TextField
                       required
                       label="Phone"
                       name="phone"
                       value={formData.phone}
-                      onChange={handleChange}
+                      onChange={
+                        handleChange
+                      }
                     />
+
 
                     <TextField
                       required
@@ -368,7 +471,9 @@ function RestaurantManagement() {
                       label="Email"
                       name="email"
                       value={formData.email}
-                      onChange={handleChange}
+                      onChange={
+                        handleChange
+                      }
                     />
 
                   </Box>
@@ -406,19 +511,21 @@ function RestaurantManagement() {
               </CardContent>
 
             </Card>
+
           )}
 
 
-          {/* ================================================== */}
-          {/* LOADING */}
-          {/* ================================================== */}
+          {/* ==================================================
+              LOADING
+          ================================================== */}
 
           {loading ? (
 
             <Box
               sx={{
                 display: "flex",
-                justifyContent: "center",
+                justifyContent:
+                  "center",
                 py: 8,
               }}
             >
@@ -427,17 +534,19 @@ function RestaurantManagement() {
 
           ) : restaurants.length === 0 ? (
 
-            /* ================================================== */
-            /* EMPTY STATE */
-            /* ================================================== */
+            /* ==================================================
+               EMPTY STATE
+            ================================================== */
 
             <Paper
               elevation={0}
               sx={{
                 p: 6,
                 textAlign: "center",
+
                 border:
                   "1px solid #e4e7eb",
+
                 borderRadius: 3,
               }}
             >
@@ -445,7 +554,8 @@ function RestaurantManagement() {
               <RestaurantIcon
                 sx={{
                   fontSize: 60,
-                  color: "text.secondary",
+                  color:
+                    "text.secondary",
                   mb: 2,
                 }}
               />
@@ -455,7 +565,8 @@ function RestaurantManagement() {
                 variant="h6"
                 fontWeight="bold"
               >
-                No restaurants registered
+                No restaurants
+                registered
               </Typography>
 
 
@@ -466,8 +577,9 @@ function RestaurantManagement() {
                   mb: 3,
                 }}
               >
-                Add your first restaurant to
-                start using TimeTap.
+                Add your first
+                restaurant to start
+                using TimeTap.
               </Typography>
 
 
@@ -485,18 +597,20 @@ function RestaurantManagement() {
 
           ) : (
 
-            /* ================================================== */
-            /* RESTAURANT LIST */
-            /* ================================================== */
+            /* ==================================================
+               RESTAURANT LIST
+            ================================================== */
 
             <Box
               sx={{
                 display: "grid",
+
                 gridTemplateColumns: {
                   xs: "1fr",
                   md: "1fr 1fr",
                   lg: "1fr 1fr 1fr",
                 },
+
                 gap: 3,
               }}
             >
@@ -510,19 +624,29 @@ function RestaurantManagement() {
                     sx={{
                       border:
                         "1px solid #e4e7eb",
+
                       borderRadius: 3,
                     }}
                   >
 
-                    <CardContent sx={{ p: 3 }}>
+                    <CardContent
+                      sx={{ p: 3 }}
+                    >
 
-                      {/* Restaurant Header */}
+                      {/* ====================================
+                          RESTAURANT HEADER
+                      ==================================== */}
 
                       <Box
                         sx={{
-                          display: "flex",
-                          alignItems: "center",
+                          display:
+                            "flex",
+
+                          alignItems:
+                            "center",
+
                           gap: 2,
+
                           mb: 3,
                         }}
                       >
@@ -531,6 +655,7 @@ function RestaurantManagement() {
                           sx={{
                             bgcolor:
                               "primary.light",
+
                             color:
                               "primary.main",
                           }}
@@ -562,10 +687,14 @@ function RestaurantManagement() {
                       </Box>
 
 
-                      <Divider sx={{ mb: 2 }} />
+                      <Divider
+                        sx={{ mb: 2 }}
+                      />
 
 
-                      {/* Restaurant Information */}
+                      {/* ====================================
+                          RESTAURANT INFORMATION
+                      ==================================== */}
 
                       <Typography
                         variant="body2"
@@ -603,18 +732,138 @@ function RestaurantManagement() {
                       </Typography>
 
 
-                      {/* Actions */}
+                      {/* ====================================
+                          EMPLOYEE INVITATION
+                      ==================================== */}
+
+                      <Box
+                        sx={{
+                          mt: 2,
+                          mb: 2,
+                          p: 2,
+
+                          bgcolor:
+                            "#f5f9ff",
+
+                          border:
+                            "1px solid #dbeafe",
+
+                          borderRadius: 2,
+                        }}
+                      >
+
+                        <Typography
+                          variant="subtitle2"
+                          fontWeight="bold"
+                          sx={{
+                            mb: 0.5,
+                          }}
+                        >
+                          Employee Invitation
+                        </Typography>
+
+
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mb: 1.5,
+                          }}
+                        >
+                          Give this code to
+                          employees so they
+                          can register for
+                          this restaurant.
+                        </Typography>
+
+
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems:
+                              "center",
+                            gap: 1,
+                          }}
+                        >
+
+                          <Box
+                            sx={{
+                              flexGrow: 1,
+                              px: 1.5,
+                              py: 1,
+
+                              bgcolor:
+                                "white",
+
+                              border:
+                                "1px solid #d1d5db",
+
+                              borderRadius: 1.5,
+                            }}
+                          >
+
+                            <Typography
+                              fontWeight="bold"
+                              sx={{
+                                fontFamily:
+                                  "monospace",
+                                letterSpacing:
+                                  1,
+                              }}
+                            >
+                              {restaurant.invitation_code ||
+                                "Not available"}
+                            </Typography>
+
+                          </Box>
+
+
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            disabled={
+                              !restaurant.invitation_code
+                            }
+                            startIcon={
+                              copiedRestaurantId ===
+                              restaurant.id
+                                ? <CheckIcon />
+                                : <ContentCopyIcon />
+                            }
+                            onClick={() =>
+                              handleCopyInvitationCode(
+                                restaurant
+                              )
+                            }
+                          >
+                            {copiedRestaurantId ===
+                            restaurant.id
+                              ? "Copied"
+                              : "Copy"}
+                          </Button>
+
+                        </Box>
+
+                      </Box>
+
+
+                      {/* ====================================
+                          ACTIONS
+                      ==================================== */}
 
                       <Box
                         sx={{
                           display: "flex",
                           gap: 1,
+
                           flexDirection: {
                             xs: "column",
                             sm: "row",
                           },
                         }}
                       >
+
+                        {/* ATTENDANCE QR */}
 
                         <Button
                           variant="contained"
@@ -628,9 +877,11 @@ function RestaurantManagement() {
                           }
                           fullWidth
                         >
-                          View QR Code
+                          Attendance QR
                         </Button>
 
+
+                        {/* DELETE */}
 
                         <Button
                           variant="outlined"
@@ -662,9 +913,9 @@ function RestaurantManagement() {
       </Box>
 
 
-      {/* ================================================== */}
-      {/* QR CODE DIALOG */}
-      {/* ================================================== */}
+      {/* ==================================================
+          ATTENDANCE QR DIALOG
+      ================================================== */}
 
       <Dialog
         open={qrDialogOpen}
@@ -673,8 +924,10 @@ function RestaurantManagement() {
         maxWidth="sm"
       >
 
-        <DialogTitle fontWeight="bold">
-          Restaurant QR Code
+        <DialogTitle
+          fontWeight="bold"
+        >
+          Restaurant Attendance QR
         </DialogTitle>
 
 
@@ -685,8 +938,10 @@ function RestaurantManagement() {
             <Box
               sx={{
                 display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
+                flexDirection:
+                  "column",
+                alignItems:
+                  "center",
                 py: 2,
               }}
             >
@@ -705,8 +960,9 @@ function RestaurantManagement() {
                 color="text.secondary"
                 sx={{ mb: 3 }}
               >
-                Employees can scan this QR code
-                to record attendance.
+                Employees can scan
+                this QR code to
+                record attendance.
               </Typography>
 
 
@@ -715,15 +971,19 @@ function RestaurantManagement() {
                 src={
                   `/api/restaurants/${selectedRestaurant.id}/qr`
                 }
-                alt={`${selectedRestaurant.name} QR Code`}
+                alt={`${selectedRestaurant.name} Attendance QR Code`}
                 sx={{
                   width: 300,
                   height: 300,
                   objectFit: "contain",
+
                   border:
                     "1px solid #e4e7eb",
+
                   borderRadius: 2,
+
                   p: 2,
+
                   bgcolor: "white",
                 }}
               />
@@ -764,8 +1024,12 @@ function RestaurantManagement() {
 
           <Button
             variant="contained"
-            startIcon={<QrCode2Icon />}
-            onClick={handleDownloadQr}
+            startIcon={
+              <QrCode2Icon />
+            }
+            onClick={
+              handleDownloadQr
+            }
           >
             Download QR Code
           </Button>
@@ -777,5 +1041,6 @@ function RestaurantManagement() {
     </Box>
   );
 }
+
 
 export default RestaurantManagement;

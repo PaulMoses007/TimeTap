@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
+
 from app.schemas.employee import (
     EmployeeRegister,
     EmployeeResponse,
 )
+
 from app.security.password import hash_password
 from app.utils.employee_code import generate_employee_code
 
@@ -17,6 +19,10 @@ router = APIRouter(
     tags=["Registration"]
 )
 
+
+# ==================================================
+# DATABASE
+# ==================================================
 
 def get_db():
     db = SessionLocal()
@@ -28,6 +34,10 @@ def get_db():
         db.close()
 
 
+# ==================================================
+# EMPLOYEE REGISTRATION
+# ==================================================
+
 @router.post(
     "/",
     response_model=EmployeeResponse
@@ -38,13 +48,20 @@ def register_employee(
 ):
 
     # --------------------------------------------------
-    # Check restaurant
+    # FIND RESTAURANT USING INVITATION CODE
     # --------------------------------------------------
+
+    invitation_code = (
+        employee.invitation_code
+        .strip()
+        .upper()
+    )
 
     restaurant = (
         db.query(Restaurant)
         .filter(
-            Restaurant.id == employee.restaurant_id
+            Restaurant.invitation_code ==
+            invitation_code
         )
         .first()
     )
@@ -52,12 +69,21 @@ def register_employee(
     if restaurant is None:
         raise HTTPException(
             status_code=404,
-            detail="Restaurant not found"
+            detail="Invalid restaurant invitation code."
         )
 
+    # --------------------------------------------------
+    # CHECK RESTAURANT STATUS
+    # --------------------------------------------------
+
+    if not restaurant.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This restaurant is currently inactive."
+        )
 
     # --------------------------------------------------
-    # Check duplicate email
+    # CHECK DUPLICATE EMAIL
     # --------------------------------------------------
 
     existing = (
@@ -71,12 +97,11 @@ def register_employee(
     if existing:
         raise HTTPException(
             status_code=400,
-            detail="Email already registered"
+            detail="Email already registered."
         )
 
-
     # --------------------------------------------------
-    # Validate schedule type
+    # VALIDATE SCHEDULE TYPE
     # --------------------------------------------------
 
     if employee.schedule_type not in [
@@ -85,31 +110,41 @@ def register_employee(
     ]:
         raise HTTPException(
             status_code=400,
-            detail="Schedule type must be Flexible or Fixed"
+            detail=(
+                "Schedule type must be "
+                "Flexible or Fixed."
+            )
         )
 
-
     # --------------------------------------------------
-    # Fixed schedule validation
+    # FIXED SCHEDULE VALIDATION
     # --------------------------------------------------
 
     if employee.schedule_type == "Fixed":
 
-        if not employee.shift_start or not employee.shift_end:
+        if (
+            not employee.shift_start
+            or not employee.shift_end
+        ):
             raise HTTPException(
                 status_code=400,
-                detail="Fixed schedule requires shift start and shift end times"
+                detail=(
+                    "Fixed schedule requires "
+                    "shift start and shift end times."
+                )
             )
 
         if employee.shift_start >= employee.shift_end:
             raise HTTPException(
                 status_code=400,
-                detail="Shift end time must be later than shift start time"
+                detail=(
+                    "Shift end time must be later "
+                    "than shift start time."
+                )
             )
 
-
     # --------------------------------------------------
-    # Flexible schedule
+    # FLEXIBLE SCHEDULE
     # --------------------------------------------------
 
     if employee.schedule_type == "Flexible":
@@ -122,9 +157,8 @@ def register_employee(
         shift_start = employee.shift_start
         shift_end = employee.shift_end
 
-
     # --------------------------------------------------
-    # Create employee
+    # CREATE EMPLOYEE
     # --------------------------------------------------
 
     new_employee = Employee(
@@ -144,7 +178,9 @@ def register_employee(
 
         role=employee.role,
 
-        restaurant_id=employee.restaurant_id,
+        # Restaurant is automatically determined
+        # from the invitation code.
+        restaurant_id=restaurant.id,
 
         password_hash=hash_password(
             employee.password
@@ -152,7 +188,9 @@ def register_employee(
 
         # Schedule
         schedule_type=employee.schedule_type,
+
         shift_start=shift_start,
+
         shift_end=shift_end,
 
         # Approval
@@ -163,9 +201,8 @@ def register_employee(
         is_active=True,
     )
 
-
     # --------------------------------------------------
-    # Save employee
+    # SAVE EMPLOYEE
     # --------------------------------------------------
 
     db.add(new_employee)
@@ -173,6 +210,5 @@ def register_employee(
     db.commit()
 
     db.refresh(new_employee)
-
 
     return new_employee
