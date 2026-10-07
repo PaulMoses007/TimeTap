@@ -19,22 +19,53 @@ PREFIXES = {
 }
 
 
-def generate_employee_code(role: str, db: Session) -> str:
-    prefix = PREFIXES.get(role, "EMP")
+def generate_employee_code(
+    role: str,
+    restaurant_id: int,
+    db: Session
+) -> str:
+
+    prefix = PREFIXES.get(
+        role,
+        "EMP"
+    )
 
     employees = (
         db.query(Employee)
-        .filter(Employee.employee_id.like(f"{prefix}%"))
+        .filter(
+            Employee.restaurant_id ==
+            restaurant_id
+        )
+        .filter(
+            Employee.employee_id.like(
+                f"{prefix}%"
+            )
+        )
         .all()
     )
 
     highest = 0
 
     for employee in employees:
+
         try:
-            number = int(employee.employee_id.replace(prefix, ""))
-            highest = max(highest, number)
-        except ValueError:
+
+            number = int(
+                employee.employee_id[
+                    len(prefix):
+                ]
+            )
+
+            highest = max(
+                highest,
+                number
+            )
+
+        except (ValueError, TypeError):
+
             continue
 
-    return f"{prefix}{highest + 1:03d}"
+    return (
+        f"{prefix}"
+        f"{highest + 1:03d}"
+    )

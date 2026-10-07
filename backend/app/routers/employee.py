@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 
@@ -14,9 +15,12 @@ from app.schemas.employee import (
 )
 
 from app.security.password import hash_password
-from app.utils.employee_code import generate_employee_code
 from app.security.dependencies import get_current_user
 from app.security.roles import require_manager
+
+from app.utils.employee_code import (
+    generate_employee_code
+)
 
 
 router = APIRouter(
@@ -40,13 +44,14 @@ def get_db():
 
 
 # ==================================================
-# ADD RESTAURANT NAME TO EMPLOYEE RESPONSE
+# EMPLOYEE RESPONSE
 # ==================================================
 
 def employee_response(
     employee: Employee,
     db: Session
 ):
+
     restaurant_name = None
 
     if employee.restaurant_id is not None:
@@ -54,7 +59,8 @@ def employee_response(
         restaurant = (
             db.query(Restaurant)
             .filter(
-                Restaurant.id == employee.restaurant_id
+                Restaurant.id ==
+                employee.restaurant_id
             )
             .first()
         )
@@ -101,39 +107,84 @@ def create_employee(
     manager_id = current_user["id"]
 
     # --------------------------------------------------
-    # Check restaurant access
+    # RESTAURANT IS REQUIRED
     # --------------------------------------------------
 
-    if employee.restaurant_id is not None:
+    if employee.restaurant_id is None:
 
-        restaurant = (
-            db.query(Restaurant)
-            .filter(
-                Restaurant.id == employee.restaurant_id,
-                Restaurant.manager_id == manager_id
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Employee must be assigned "
+                "to a restaurant."
             )
-            .first()
         )
 
-        if restaurant is None:
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "You do not have access "
-                    "to this restaurant."
-                )
+    # --------------------------------------------------
+    # CHECK RESTAURANT ACCESS
+    # --------------------------------------------------
+
+    restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.id ==
+            employee.restaurant_id,
+
+            Restaurant.manager_id ==
+            manager_id
+        )
+        .first()
+    )
+
+    if restaurant is None:
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "You do not have access "
+                "to this restaurant."
             )
+        )
 
     # --------------------------------------------------
-    # Create employee
+    # CHECK DUPLICATE EMAIL
+    # --------------------------------------------------
+
+    existing = (
+        db.query(Employee)
+        .filter(
+            Employee.email ==
+            employee.email
+        )
+        .first()
+    )
+
+    if existing:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Email already registered."
+            )
+        )
+
+    # --------------------------------------------------
+    # GENERATE RESTAURANT-SPECIFIC ID
+    # --------------------------------------------------
+
+    employee_code = generate_employee_code(
+        employee.role,
+        employee.restaurant_id,
+        db
+    )
+
+    # --------------------------------------------------
+    # CREATE EMPLOYEE
     # --------------------------------------------------
 
     new_employee = Employee(
 
-        employee_id=generate_employee_code(
-            employee.role,
-            db
-        ),
+        employee_id=employee_code,
 
         first_name=employee.first_name,
 
@@ -156,6 +207,16 @@ def create_employee(
         shift_start=employee.shift_start,
 
         shift_end=employee.shift_end,
+
+        approval_status="Approved",
+
+        approved_by=manager_id,
+
+        approved_at=datetime.utcnow(),
+
+        is_verified=True,
+
+        is_active=True,
     )
 
     db.add(new_employee)
@@ -186,23 +247,28 @@ def get_all_employees(
     manager_id = current_user["id"]
 
     # --------------------------------------------------
-    # Find restaurants managed by current manager
+    # FIND RESTAURANTS MANAGED BY CURRENT MANAGER
     # --------------------------------------------------
 
     managed_restaurant_ids = [
         restaurant.id
+
         for restaurant in (
             db.query(Restaurant)
             .filter(
-                Restaurant.manager_id == manager_id
+                Restaurant.manager_id ==
+                manager_id
             )
             .all()
         )
     ]
 
     # --------------------------------------------------
-    # Find employees belonging to those restaurants
+    # FIND EMPLOYEES IN THOSE RESTAURANTS
     # --------------------------------------------------
+
+    if not managed_restaurant_ids:
+        return []
 
     employees = (
         db.query(Employee)
@@ -215,7 +281,11 @@ def get_all_employees(
     )
 
     return [
-        employee_response(employee, db)
+        employee_response(
+            employee,
+            db
+        )
+
         for employee in employees
     ]
 
@@ -237,19 +307,26 @@ def get_pending_employees(
 
     managed_restaurant_ids = [
         restaurant.id
+
         for restaurant in (
             db.query(Restaurant)
             .filter(
-                Restaurant.manager_id == manager_id
+                Restaurant.manager_id ==
+                manager_id
             )
             .all()
         )
     ]
 
+    if not managed_restaurant_ids:
+        return []
+
     employees = (
         db.query(Employee)
         .filter(
-            Employee.approval_status == "Pending",
+            Employee.approval_status ==
+            "Pending",
+
             Employee.restaurant_id.in_(
                 managed_restaurant_ids
             )
@@ -258,7 +335,11 @@ def get_pending_employees(
     )
 
     return [
-        employee_response(employee, db)
+        employee_response(
+            employee,
+            db
+        )
+
         for employee in employees
     ]
 
@@ -283,16 +364,20 @@ def approve_employee(
         db.query(Employee)
         .join(
             Restaurant,
-            Employee.restaurant_id == Restaurant.id
+            Employee.restaurant_id ==
+            Restaurant.id
         )
         .filter(
             Employee.id == employee_id,
-            Restaurant.manager_id == manager_id
+
+            Restaurant.manager_id ==
+            manager_id
         )
         .first()
     )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
@@ -336,16 +421,20 @@ def reject_employee(
         db.query(Employee)
         .join(
             Restaurant,
-            Employee.restaurant_id == Restaurant.id
+            Employee.restaurant_id ==
+            Restaurant.id
         )
         .filter(
             Employee.id == employee_id,
-            Restaurant.manager_id == manager_id
+
+            Restaurant.manager_id ==
+            manager_id
         )
         .first()
     )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
@@ -385,12 +474,14 @@ def get_current_employee(
     employee = (
         db.query(Employee)
         .filter(
-            Employee.id == current_user["id"]
+            Employee.id ==
+            current_user["id"]
         )
         .first()
     )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Current employee not found"
@@ -417,7 +508,7 @@ def get_employee(
 ):
 
     # --------------------------------------------------
-    # Employee can view own profile
+    # EMPLOYEE CAN VIEW OWN PROFILE
     # --------------------------------------------------
 
     if current_user["id"] == employee_id:
@@ -425,13 +516,14 @@ def get_employee(
         employee = (
             db.query(Employee)
             .filter(
-                Employee.id == employee_id
+                Employee.id ==
+                employee_id
             )
             .first()
         )
 
     # --------------------------------------------------
-    # Manager can view employees in managed restaurants
+    # MANAGER CAN VIEW THEIR EMPLOYEES
     # --------------------------------------------------
 
     elif current_user["role"] == "Manager":
@@ -440,10 +532,13 @@ def get_employee(
             db.query(Employee)
             .join(
                 Restaurant,
-                Employee.restaurant_id == Restaurant.id
+                Employee.restaurant_id ==
+                Restaurant.id
             )
             .filter(
-                Employee.id == employee_id,
+                Employee.id ==
+                employee_id,
+
                 Restaurant.manager_id ==
                 current_user["id"]
             )
@@ -458,6 +553,7 @@ def get_employee(
         )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
@@ -487,69 +583,114 @@ def update_employee(
     manager_id = current_user["id"]
 
     # --------------------------------------------------
-    # Find employee in manager's restaurants
+    # FIND EMPLOYEE IN MANAGER'S RESTAURANTS
     # --------------------------------------------------
 
     employee = (
         db.query(Employee)
         .join(
             Restaurant,
-            Employee.restaurant_id == Restaurant.id
+            Employee.restaurant_id ==
+            Restaurant.id
         )
         .filter(
-            Employee.id == employee_id,
-            Restaurant.manager_id == manager_id
+            Employee.id ==
+            employee_id,
+
+            Restaurant.manager_id ==
+            manager_id
         )
         .first()
     )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
         )
 
     # --------------------------------------------------
-    # Validate new restaurant assignment
+    # RESTAURANT IS REQUIRED
     # --------------------------------------------------
 
-    if employee_data.restaurant_id is not None:
+    if employee_data.restaurant_id is None:
 
-        restaurant = (
-            db.query(Restaurant)
-            .filter(
-                Restaurant.id ==
-                employee_data.restaurant_id,
-                Restaurant.manager_id ==
-                manager_id
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Employee must be assigned "
+                "to a restaurant."
             )
-            .first()
         )
 
-        if restaurant is None:
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "You cannot assign an employee "
-                    "to a restaurant you do not manage."
-                )
+    # --------------------------------------------------
+    # VALIDATE TARGET RESTAURANT
+    # --------------------------------------------------
+
+    restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.id ==
+            employee_data.restaurant_id,
+
+            Restaurant.manager_id ==
+            manager_id
+        )
+        .first()
+    )
+
+    if restaurant is None:
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "You cannot assign an employee "
+                "to a restaurant you do not manage."
             )
+        )
 
     # --------------------------------------------------
-    # Update employee
+    # CHECK WHETHER ID NEEDS TO CHANGE
     # --------------------------------------------------
 
-    employee.first_name = employee_data.first_name
+    restaurant_changed = (
+        employee.restaurant_id !=
+        employee_data.restaurant_id
+    )
 
-    employee.last_name = employee_data.last_name
+    role_changed = (
+        employee.role !=
+        employee_data.role
+    )
 
-    employee.email = employee_data.email
+    # --------------------------------------------------
+    # UPDATE BASIC INFORMATION
+    # --------------------------------------------------
 
-    employee.phone = employee_data.phone
+    employee.first_name = (
+        employee_data.first_name
+    )
 
-    employee.role = employee_data.role
+    employee.last_name = (
+        employee_data.last_name
+    )
 
-    employee.is_active = employee_data.is_active
+    employee.email = (
+        employee_data.email
+    )
+
+    employee.phone = (
+        employee_data.phone
+    )
+
+    employee.role = (
+        employee_data.role
+    )
+
+    employee.is_active = (
+        employee_data.is_active
+    )
 
     employee.restaurant_id = (
         employee_data.restaurant_id
@@ -566,6 +707,23 @@ def update_employee(
     employee.shift_end = (
         employee_data.shift_end
     )
+
+    # --------------------------------------------------
+    # REGENERATE BUSINESS ID WHEN NEEDED
+    # --------------------------------------------------
+
+    if (
+        restaurant_changed
+        or role_changed
+    ):
+
+        employee.employee_id = (
+            generate_employee_code(
+                employee_data.role,
+                employee_data.restaurant_id,
+                db
+            )
+        )
 
     db.commit()
 
@@ -596,16 +754,21 @@ def delete_employee(
         db.query(Employee)
         .join(
             Restaurant,
-            Employee.restaurant_id == Restaurant.id
+            Employee.restaurant_id ==
+            Restaurant.id
         )
         .filter(
-            Employee.id == employee_id,
-            Restaurant.manager_id == manager_id
+            Employee.id ==
+            employee_id,
+
+            Restaurant.manager_id ==
+            manager_id
         )
         .first()
     )
 
     if employee is None:
+
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
@@ -616,5 +779,6 @@ def delete_employee(
     db.commit()
 
     return {
-        "message": "Employee deleted successfully"
+        "message":
+            "Employee deleted successfully"
     }

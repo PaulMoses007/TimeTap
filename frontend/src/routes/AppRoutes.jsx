@@ -8,6 +8,7 @@ import Login from "../pages/Login/Login";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import EmployeeList from "../pages/Employees/EmployeeList";
 import Register from "../pages/Register/Register";
+import RegisterManager from "../pages/RegisterManager/RegisterManager";
 import EmployeeDashboard from "../pages/EmployeeDashboard/EmployeeDashboard";
 import EmployeeAttendance from "../pages/EmployeeAttendance/EmployeeAttendance";
 import EmployeeProfile from "../pages/EmployeeProfile/EmployeeProfile";
@@ -16,72 +17,126 @@ import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
 import Reports from "../pages/Reports/Reports";
 import Settings from "../pages/Settings/Settings";
 
+
 function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* Login */}
+        {/* ==========================================
+            LOGIN
+        ========================================== */}
+
         <Route
           path="/"
           element={<Login />}
         />
 
-        {/* Manager Dashboard */}
+
+        {/* ==========================================
+            MANAGER REGISTRATION
+        ========================================== */}
+
+        <Route
+          path="/register-manager"
+          element={<RegisterManager />}
+        />
+
+
+        {/* ==========================================
+            MANAGER DASHBOARD
+        ========================================== */}
+
         <Route
           path="/dashboard"
           element={<Dashboard />}
         />
 
-        {/* Employees */}
+
+        {/* ==========================================
+            EMPLOYEES
+        ========================================== */}
+
         <Route
           path="/employees"
           element={<EmployeeList />}
         />
 
-        {/* Manager Attendance */}
+
+        {/* ==========================================
+            MANAGER ATTENDANCE
+        ========================================== */}
+
         <Route
           path="/manager-attendance"
           element={<ManagerAttendance />}
         />
 
-        {/* Restaurants */}
+
+        {/* ==========================================
+            RESTAURANTS
+        ========================================== */}
+
         <Route
           path="/restaurants"
           element={<RestaurantManagement />}
         />
 
-        {/* Reports */}
+
+        {/* ==========================================
+            REPORTS
+        ========================================== */}
+
         <Route
           path="/reports"
           element={<Reports />}
         />
 
-        {/* Settings */}
+
+        {/* ==========================================
+            SETTINGS
+        ========================================== */}
+
         <Route
           path="/settings"
           element={<Settings />}
         />
 
-        {/* Employee Registration */}
+
+        {/* ==========================================
+            EMPLOYEE REGISTRATION
+        ========================================== */}
+
         <Route
           path="/register"
           element={<Register />}
         />
 
-        {/* Employee Dashboard */}
+
+        {/* ==========================================
+            EMPLOYEE DASHBOARD
+        ========================================== */}
+
         <Route
           path="/employee-dashboard"
           element={<EmployeeDashboard />}
         />
 
-        {/* Employee Attendance */}
+
+        {/* ==========================================
+            EMPLOYEE ATTENDANCE
+        ========================================== */}
+
         <Route
           path="/employee-attendance"
           element={<EmployeeAttendance />}
         />
 
-        {/* Employee Profile */}
+
+        {/* ==========================================
+            EMPLOYEE PROFILE
+        ========================================== */}
+
         <Route
           path="/employee-profile"
           element={<EmployeeProfile />}
@@ -91,5 +146,6 @@ function AppRoutes() {
     </BrowserRouter>
   );
 }
+
 
 export default AppRoutes;

@@ -8,6 +8,7 @@ import {
   Button,
   CircularProgress,
   Container,
+  Divider,
   Paper,
   TextField,
   Typography,
@@ -17,93 +18,175 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import { login } from "../../services/authService";
 
+
 function decodeToken(token) {
   try {
     const payload = token.split(".")[1];
 
     const decodedPayload = atob(
-      payload.replace(/-/g, "+").replace(/_/g, "/")
+      payload
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
     );
 
     return JSON.parse(decodedPayload);
+
   } catch (error) {
-    console.error("Failed to decode token:", error);
+
+    console.error(
+      "Failed to decode token:",
+      error
+    );
+
     return null;
   }
 }
 
+
 function Login() {
+
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [password, setPassword] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+
+  // ==================================================
+  // LOGIN
+  // ==================================================
 
   const handleLogin = async (e) => {
+
     e.preventDefault();
 
     setError("");
+
     setLoading(true);
 
     try {
-      const data = await login(email, password);
+
+      const data =
+        await login(
+          email,
+          password
+        );
+
 
       localStorage.setItem(
         "access_token",
         data.access_token
       );
 
-      const user = decodeToken(data.access_token);
+
+      const user =
+        decodeToken(
+          data.access_token
+        );
+
 
       if (!user) {
+
         throw new Error(
           "Unable to read user information."
         );
       }
 
-      if (user.role === "Manager") {
-        navigate("/dashboard");
-      } else {
-        navigate("/employee-dashboard");
+
+      // ----------------------------------------------
+      // MANAGER
+      // ----------------------------------------------
+
+      if (
+        user.role === "Manager"
+      ) {
+
+        navigate(
+          "/dashboard"
+        );
+
       }
+
+      // ----------------------------------------------
+      // EMPLOYEE
+      // ----------------------------------------------
+
+      else {
+
+        navigate(
+          "/employee-dashboard"
+        );
+
+      }
+
     } catch (err) {
+
       console.error(err);
 
       setError(
         err.response?.data?.detail ||
-          err.message ||
-          "Invalid email or password."
+        err.message ||
+        "Invalid email or password."
       );
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
+
+  // ==================================================
+  // PAGE
+  // ==================================================
+
   return (
+
     <Container maxWidth="sm">
+
       <Paper
         elevation={8}
         sx={{
           mt: 10,
+          mb: 6,
           p: 5,
           borderRadius: 4,
         }}
       >
+
         <Box
           display="flex"
           flexDirection="column"
           alignItems="center"
         >
+
+          {/* ==========================================
+              LOGO
+          ========================================== */}
+
           <Avatar
             sx={{
-              bgcolor: "primary.main",
+              bgcolor:
+                "primary.main",
               mb: 2,
             }}
           >
             <LockOutlinedIcon />
           </Avatar>
+
+
+          {/* ==========================================
+              TITLE
+          ========================================== */}
 
           <Typography
             variant="h4"
@@ -113,14 +196,22 @@ function Login() {
             TimeTap
           </Typography>
 
+
           <Typography
             color="text.secondary"
             mb={3}
           >
-            Restaurant Attendance System
+            Restaurant Attendance
+            System
           </Typography>
 
+
+          {/* ==========================================
+              ERROR
+          ========================================== */}
+
           {error && (
+
             <Alert
               severity="error"
               sx={{
@@ -130,7 +221,13 @@ function Login() {
             >
               {error}
             </Alert>
+
           )}
+
+
+          {/* ==========================================
+              LOGIN FORM
+          ========================================== */}
 
           <Box
             component="form"
@@ -139,6 +236,9 @@ function Login() {
               width: "100%",
             }}
           >
+
+            {/* EMAIL */}
+
             <TextField
               fullWidth
               required
@@ -146,9 +246,14 @@ function Login() {
               margin="normal"
               value={email}
               onChange={(e) =>
-                setEmail(e.target.value)
+                setEmail(
+                  e.target.value
+                )
               }
             />
+
+
+            {/* PASSWORD */}
 
             <TextField
               fullWidth
@@ -158,9 +263,14 @@ function Login() {
               margin="normal"
               value={password}
               onChange={(e) =>
-                setPassword(e.target.value)
+                setPassword(
+                  e.target.value
+                )
               }
             />
+
+
+            {/* LOGIN */}
 
             <Button
               fullWidth
@@ -172,37 +282,100 @@ function Login() {
               disabled={loading}
               type="submit"
             >
+
               {loading ? (
+
                 <CircularProgress
                   size={24}
                   color="inherit"
                 />
+
               ) : (
+
                 "Login"
+
               )}
+
             </Button>
+
+
+            {/* ========================================
+                EMPLOYEE REGISTRATION
+            ======================================== */}
 
             <Typography
               textAlign="center"
               color="text.secondary"
-              sx={{ mt: 3 }}
+              sx={{
+                mt: 3,
+              }}
             >
-              Don't have an account?
+              Don't have an employee
+              account?
             </Typography>
+
 
             <Button
               fullWidth
               variant="outlined"
-              sx={{ mt: 1 }}
-              onClick={() => navigate("/register")}
+              sx={{
+                mt: 1,
+              }}
+              onClick={() =>
+                navigate(
+                  "/register"
+                )
+              }
             >
               Register as Employee
             </Button>
+
+
+            <Divider
+              sx={{
+                my: 3,
+              }}
+            />
+
+
+            {/* ========================================
+                MANAGER REGISTRATION
+            ======================================== */}
+
+            <Typography
+              textAlign="center"
+              color="text.secondary"
+            >
+              Are you a restaurant manager?
+            </Typography>
+
+
+            <Button
+              fullWidth
+              variant="outlined"
+              color="secondary"
+              sx={{
+                mt: 1,
+              }}
+              onClick={() =>
+                navigate(
+                  "/register-manager"
+                )
+              }
+            >
+              Create Manager Account
+            </Button>
+
           </Box>
+
         </Box>
+
       </Paper>
+
     </Container>
+
   );
 }
+
 
 export default Login;

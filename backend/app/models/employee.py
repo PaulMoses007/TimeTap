@@ -7,22 +7,53 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
 )
 
 from app.core.database import Base
 
 
 class Employee(Base):
+
     __tablename__ = "employees"
 
-    id = Column(Integer, primary_key=True, index=True)
+    # --------------------------------------------------
+    # DATABASE ID
+    # --------------------------------------------------
 
-    # Employee Code (M001, C001, W001...)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    # --------------------------------------------------
+    # EMPLOYEE BUSINESS CODE
+    # --------------------------------------------------
+    #
+    # Example:
+    #
+    # Restaurant 1:
+    # M001
+    # W001
+    # W002
+    #
+    # Restaurant 2:
+    # M001
+    # W001
+    #
+    # The combination of restaurant_id + employee_id
+    # must be unique.
+    # --------------------------------------------------
+
     employee_id = Column(
         String,
-        unique=True,
         nullable=False
     )
+
+    # --------------------------------------------------
+    # PERSONAL INFORMATION
+    # --------------------------------------------------
 
     first_name = Column(
         String,
@@ -45,14 +76,18 @@ class Employee(Base):
         nullable=False
     )
 
-    # Manager, Chef, Waiter...
+    # --------------------------------------------------
+    # ROLE
+    # --------------------------------------------------
+
+    # Manager, Chef, Waiter, Other role, etc.
     role = Column(
         String,
         nullable=False
     )
 
     # --------------------------------------------------
-    # Restaurant Assignment
+    # RESTAURANT ASSIGNMENT
     # --------------------------------------------------
 
     restaurant_id = Column(
@@ -62,7 +97,7 @@ class Employee(Base):
     )
 
     # --------------------------------------------------
-    # Employee Schedule
+    # EMPLOYEE SCHEDULE
     # --------------------------------------------------
 
     # Flexible or Fixed
@@ -72,14 +107,14 @@ class Employee(Base):
         nullable=False
     )
 
-    # Used only when schedule_type = "Fixed"
+    # Used when schedule_type = Fixed
     # Example: "11:00"
     shift_start = Column(
         String,
         nullable=True
     )
 
-    # Used only when schedule_type = "Fixed"
+    # Used when schedule_type = Fixed
     # Example: "19:00"
     shift_end = Column(
         String,
@@ -87,7 +122,7 @@ class Employee(Base):
     )
 
     # --------------------------------------------------
-    # Approval
+    # APPROVAL
     # --------------------------------------------------
 
     # Pending / Approved / Rejected
@@ -96,21 +131,20 @@ class Employee(Base):
         default="Pending"
     )
 
-    # Manager ID who approved this employee
+    # Manager who approved this employee
     approved_by = Column(
         Integer,
         ForeignKey("employees.id"),
         nullable=True
     )
 
-    # Approval timestamp
     approved_at = Column(
         DateTime,
         nullable=True
     )
 
     # --------------------------------------------------
-    # Authentication
+    # AUTHENTICATION
     # --------------------------------------------------
 
     password_hash = Column(
@@ -118,26 +152,23 @@ class Employee(Base):
         nullable=True
     )
 
-    # Account Active
     is_active = Column(
         Boolean,
         default=True
     )
 
-    # Email / Account Verified
     is_verified = Column(
         Boolean,
         default=False
     )
 
-    # Last Login
     last_login = Column(
         DateTime,
         nullable=True
     )
 
     # --------------------------------------------------
-    # Timestamps
+    # TIMESTAMPS
     # --------------------------------------------------
 
     created_at = Column(
@@ -149,4 +180,16 @@ class Employee(Base):
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow
+    )
+
+    # --------------------------------------------------
+    # RESTAURANT-SCOPED EMPLOYEE ID
+    # --------------------------------------------------
+
+    __table_args__ = (
+        UniqueConstraint(
+            "restaurant_id",
+            "employee_id",
+            name="uq_employee_restaurant_code"
+        ),
     )
