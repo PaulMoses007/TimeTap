@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -45,6 +46,24 @@ router = APIRouter(
 )
 
 
+# ============================================================
+# TIMEZONE
+# ============================================================
+
+RIGA_TZ = ZoneInfo("Europe/Riga")
+
+
+def get_riga_today():
+    """
+    Return today's date according to Riga local time.
+    """
+    return datetime.now(RIGA_TZ).date()
+
+
+# ============================================================
+# DATABASE
+# ============================================================
+
 def get_db():
     db = SessionLocal()
 
@@ -68,16 +87,45 @@ def get_today_attendance(
     current_user=Depends(require_manager)
 ):
     """
-    Return today's attendance for employees.
+    Return today's attendance for employees
+    belonging to the logged-in manager's restaurant.
 
     Managers are excluded from attendance records.
     """
 
+    # -----------------------------------------
+    # Find manager's restaurant
+    # -----------------------------------------
+
+    manager_restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.manager_id == current_user["id"]
+        )
+        .first()
+    )
+
+    if manager_restaurant is None:
+        return []
+
+    # -----------------------------------------
+    # Get employees from manager's restaurant
+    # -----------------------------------------
+
     employees = (
         db.query(Employee)
-        .filter(Employee.role != "Manager")
+        .filter(
+            Employee.role != "Manager",
+            Employee.restaurant_id == manager_restaurant.id
+        )
         .all()
     )
+
+    # -----------------------------------------
+    # Use Riga local date
+    # -----------------------------------------
+
+    today = get_riga_today()
 
     results = []
 
@@ -110,7 +158,7 @@ def get_today_attendance(
             db.query(Attendance)
             .filter(
                 Attendance.employee_id == employee.id,
-                Attendance.work_date == date.today()
+                Attendance.work_date == today
             )
             .first()
         )
@@ -173,18 +221,45 @@ def get_weekly_attendance(
     current_user=Depends(require_manager)
 ):
     """
-    Return attendance summary for the last 7 days.
+    Return attendance summary for the last 7 days
+    for employees belonging to the logged-in manager's restaurant.
 
     Managers are excluded.
     """
 
-    today = date.today()
+    # -----------------------------------------
+    # Use Riga local date
+    # -----------------------------------------
+
+    today = get_riga_today()
 
     start_date = today - timedelta(days=6)
 
+    # -----------------------------------------
+    # Find manager's restaurant
+    # -----------------------------------------
+
+    manager_restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.manager_id == current_user["id"]
+        )
+        .first()
+    )
+
+    if manager_restaurant is None:
+        return []
+
+    # -----------------------------------------
+    # Get employees from manager's restaurant
+    # -----------------------------------------
+
     employees = (
         db.query(Employee)
-        .filter(Employee.role != "Manager")
+        .filter(
+            Employee.role != "Manager",
+            Employee.restaurant_id == manager_restaurant.id
+        )
         .all()
     )
 
@@ -273,20 +348,47 @@ def get_monthly_attendance(
     current_user=Depends(require_manager)
 ):
     """
-    Return attendance summary for the current month.
+    Return attendance summary for the current month
+    for employees belonging to the logged-in manager's restaurant.
 
     Managers are excluded.
     """
 
-    today = date.today()
+    # -----------------------------------------
+    # Use Riga local date
+    # -----------------------------------------
+
+    today = get_riga_today()
 
     start_date = today.replace(
         day=1
     )
 
+    # -----------------------------------------
+    # Find manager's restaurant
+    # -----------------------------------------
+
+    manager_restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.manager_id == current_user["id"]
+        )
+        .first()
+    )
+
+    if manager_restaurant is None:
+        return []
+
+    # -----------------------------------------
+    # Get employees from manager's restaurant
+    # -----------------------------------------
+
     employees = (
         db.query(Employee)
-        .filter(Employee.role != "Manager")
+        .filter(
+            Employee.role != "Manager",
+            Employee.restaurant_id == manager_restaurant.id
+        )
         .all()
     )
 
