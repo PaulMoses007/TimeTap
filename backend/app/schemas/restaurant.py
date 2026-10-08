@@ -41,6 +41,9 @@ class RestaurantResponse(BaseModel):
 
     is_active: bool
 
+    # Manager who owns this restaurant
+    manager_id: int | None = None
+
     # Employee registration invitation code
     invitation_code: str | None = None
 

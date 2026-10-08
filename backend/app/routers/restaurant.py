@@ -7,8 +7,10 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
+
 from app.models.restaurant import Restaurant
 from app.models.employee import Employee
+
 from app.qr.qr_generator import generate_restaurant_qr
 
 from app.schemas.restaurant import (
@@ -16,9 +18,16 @@ from app.schemas.restaurant import (
     RestaurantUpdate,
     RestaurantResponse,
 )
-from app.schemas.employee import EmployeeResponse
+
+from app.schemas.employee import (
+    EmployeeResponse
+)
 
 from app.security.roles import require_manager
+
+from app.utils.employee_code import (
+    generate_employee_code
+)
 
 
 router = APIRouter(
@@ -45,7 +54,9 @@ def get_db():
 # EMPLOYEE INVITATION CODE
 # ==================================================
 
-def generate_invitation_code(db: Session):
+def generate_invitation_code(
+    db: Session
+):
 
     characters = (
         string.ascii_uppercase +
@@ -65,7 +76,8 @@ def generate_invitation_code(db: Session):
         existing = (
             db.query(Restaurant)
             .filter(
-                Restaurant.invitation_code == code
+                Restaurant.invitation_code ==
+                code
             )
             .first()
         )
@@ -90,6 +102,10 @@ def create_restaurant(
 
     manager_id = current_user["id"]
 
+    # --------------------------------------------------
+    # FIND MANAGER
+    # --------------------------------------------------
+
     manager = (
         db.query(Employee)
         .filter(
@@ -99,33 +115,98 @@ def create_restaurant(
     )
 
     if manager is None:
+
         raise HTTPException(
             status_code=404,
             detail="Manager account not found"
         )
 
     if manager.role != "Manager":
+
         raise HTTPException(
             status_code=403,
-            detail="Only managers can create restaurants"
+            detail=(
+                "Only managers can "
+                "create restaurants"
+            )
         )
 
+    # --------------------------------------------------
+    # PREVENT DUPLICATE RESTAURANT
+    # --------------------------------------------------
+
+    existing_restaurant = (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.manager_id ==
+            manager_id
+        )
+        .first()
+    )
+
+    if existing_restaurant is not None:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "You already have a restaurant."
+            )
+        )
+
+    # --------------------------------------------------
+    # CREATE RESTAURANT
+    # --------------------------------------------------
+
     new_restaurant = Restaurant(
+
         name=restaurant.name,
+
         address=restaurant.address,
+
         phone=restaurant.phone,
+
         email=restaurant.email,
+
         manager_id=manager_id,
-        invitation_code=generate_invitation_code(db),
+
+        invitation_code=
+            generate_invitation_code(db),
     )
 
     db.add(new_restaurant)
+
+    db.flush()
+
+    # --------------------------------------------------
+    # GENERATE MANAGER ID
+    # --------------------------------------------------
+
+    manager.employee_id = (
+        generate_employee_code(
+            "Manager",
+            new_restaurant.id,
+            db
+        )
+    )
+
+    manager.restaurant_id = (
+        new_restaurant.id
+    )
+
+    # --------------------------------------------------
+    # SAVE
+    # --------------------------------------------------
 
     db.commit()
 
     db.refresh(new_restaurant)
 
-    # Generate attendance QR code
+    db.refresh(manager)
+
+    # --------------------------------------------------
+    # GENERATE ATTENDANCE QR
+    # --------------------------------------------------
+
     generate_restaurant_qr(
         new_restaurant.id,
         new_restaurant.name
@@ -149,15 +230,14 @@ def get_all_restaurants(
 
     manager_id = current_user["id"]
 
-    restaurants = (
+    return (
         db.query(Restaurant)
         .filter(
-            Restaurant.manager_id == manager_id
+            Restaurant.manager_id ==
+            manager_id
         )
         .all()
     )
-
-    return restaurants
 
 
 # ==================================================
@@ -186,6 +266,7 @@ def get_restaurant(
     )
 
     if restaurant is None:
+
         raise HTTPException(
             status_code=404,
             detail="Restaurant not found"
@@ -195,7 +276,7 @@ def get_restaurant(
 
 
 # ==================================================
-# GET EMPLOYEES OF RESTAURANT
+# GET EMPLOYEES
 # ==================================================
 
 @router.get(
@@ -220,20 +301,20 @@ def get_restaurant_employees(
     )
 
     if restaurant is None:
+
         raise HTTPException(
             status_code=404,
             detail="Restaurant not found"
         )
 
-    employees = (
+    return (
         db.query(Employee)
         .filter(
-            Employee.restaurant_id == restaurant_id
+            Employee.restaurant_id ==
+            restaurant_id
         )
         .all()
     )
-
-    return employees
 
 
 # ==================================================
@@ -263,6 +344,7 @@ def update_restaurant(
     )
 
     if restaurant is None:
+
         raise HTTPException(
             status_code=404,
             detail="Restaurant not found"
@@ -306,22 +388,36 @@ def delete_restaurant(
     )
 
     if restaurant is None:
+
         raise HTTPException(
             status_code=404,
             detail="Restaurant not found"
         )
+
+    employees = (
+        db.query(Employee)
+        .filter(
+            Employee.restaurant_id ==
+            restaurant_id
+        )
+        .all()
+    )
+
+    for employee in employees:
+        employee.restaurant_id = None
 
     db.delete(restaurant)
 
     db.commit()
 
     return {
-        "message": "Restaurant deleted successfully"
+        "message":
+            "Restaurant deleted successfully"
     }
 
 
 # ==================================================
-# GET ATTENDANCE QR CODE
+# GET ATTENDANCE QR
 # ==================================================
 
 @router.get(
@@ -345,6 +441,7 @@ def get_restaurant_qr(
     )
 
     if restaurant is None:
+
         raise HTTPException(
             status_code=404,
             detail="Restaurant not found"
@@ -355,6 +452,7 @@ def get_restaurant_qr(
     )
 
     if not os.path.exists(filepath):
+
         raise HTTPException(
             status_code=404,
             detail="QR code not found"
@@ -363,5 +461,7 @@ def get_restaurant_qr(
     return FileResponse(
         path=filepath,
         media_type="image/png",
-        filename=f"restaurant_{restaurant_id}.png"
+        filename=(
+            f"restaurant_{restaurant_id}.png"
+        )
     )
