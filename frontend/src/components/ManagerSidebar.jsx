@@ -1,5 +1,4 @@
 import React from "react";
-
 import {
   Box,
   Typography,
@@ -16,6 +15,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import PersonIcon from "@mui/icons-material/Person";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
 
@@ -58,6 +58,12 @@ function ManagerSidebar({ activePage }) {
       id: "reports",
     },
     {
+      text: "My Profile",
+      icon: <PersonIcon />,
+      path: "/manager-profile",
+      id: "profile",
+    },
+    {
       text: "Settings",
       icon: <SettingsIcon />,
       path: "/settings",
@@ -68,7 +74,6 @@ function ManagerSidebar({ activePage }) {
   const handleLogout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
-
     navigate("/");
   };
 
@@ -78,7 +83,6 @@ function ManagerSidebar({ activePage }) {
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-
         "& .MuiDrawer-paper": {
           width: drawerWidth,
           boxSizing: "border-box",
@@ -87,16 +91,7 @@ function ManagerSidebar({ activePage }) {
         },
       }}
     >
-      {/* ================================================== */}
-      {/* HEADER */}
-      {/* ================================================== */}
-
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-        }}
-      >
+      <Box sx={{ px: 3, py: 2 }}>
         <Box
           sx={{
             display: "flex",
@@ -104,7 +99,6 @@ function ManagerSidebar({ activePage }) {
             gap: 1.5,
           }}
         >
-          {/* TimeTap Clock Logo */}
           <Box
             sx={{
               width: 34,
@@ -125,7 +119,6 @@ function ManagerSidebar({ activePage }) {
             />
           </Box>
 
-          {/* TimeTap */}
           <Typography
             variant="h5"
             fontWeight="500"
@@ -138,7 +131,6 @@ function ManagerSidebar({ activePage }) {
           </Typography>
         </Box>
 
-        {/* Manager Panel */}
         <Typography
           variant="body2"
           sx={{
@@ -152,16 +144,7 @@ function ManagerSidebar({ activePage }) {
 
       <Divider />
 
-      {/* ================================================== */}
-      {/* NAVIGATION */}
-      {/* ================================================== */}
-
-      <List
-        sx={{
-          px: 2,
-          py: 2,
-        }}
-      >
+      <List sx={{ px: 2, py: 2 }}>
         {menuItems.map((item) => {
           const isActive = activePage === item.id;
 
@@ -177,19 +160,13 @@ function ManagerSidebar({ activePage }) {
 
                 "& .MuiListItemIcon-root": {
                   minWidth: 40,
-                  color: isActive
-                    ? "#1976d2"
-                    : "#757575",
+                  color: isActive ? "#1976d2" : "#757575",
                 },
 
                 "& .MuiListItemText-primary": {
                   fontSize: "14px",
-                  color: isActive
-                    ? "#1976d2"
-                    : "#111827",
-                  fontWeight: isActive
-                    ? 500
-                    : 400,
+                  color: isActive ? "#1976d2" : "#111827",
+                  fontWeight: isActive ? 500 : 400,
                 },
 
                 "&.Mui-selected": {
@@ -205,36 +182,18 @@ function ManagerSidebar({ activePage }) {
                 },
               }}
             >
-              <ListItemIcon>
-                {item.icon}
-              </ListItemIcon>
-
-              <ListItemText
-                primary={item.text}
-              />
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
             </ListItemButton>
           );
         })}
       </List>
 
-      {/* ================================================== */}
-      {/* PUSH LOGOUT TO BOTTOM */}
-      {/* ================================================== */}
-
       <Box sx={{ flexGrow: 1 }} />
 
       <Divider />
 
-      {/* ================================================== */}
-      {/* LOGOUT */}
-      {/* ================================================== */}
-
-      <Box
-        sx={{
-          px: 2,
-          py: 2,
-        }}
-      >
+      <Box sx={{ px: 2, py: 2 }}>
         <ListItemButton
           onClick={handleLogout}
           sx={{

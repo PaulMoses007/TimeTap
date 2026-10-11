@@ -1,8 +1,4 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "../pages/Login/Login";
 import Dashboard from "../pages/Dashboard/Dashboard";
@@ -14,138 +10,55 @@ import EmployeeAttendance from "../pages/EmployeeAttendance/EmployeeAttendance";
 import EmployeeProfile from "../pages/EmployeeProfile/EmployeeProfile";
 import RestaurantManagement from "../pages/Restaurants/RestaurantManagement";
 import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
+import ManagerProfile from "../pages/ManagerProfile/ManagerProfile";
 import Reports from "../pages/Reports/Reports";
 import Settings from "../pages/Settings/Settings";
-
 
 function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Login */}
+        <Route path="/" element={<Login />} />
 
-        {/* ==========================================
-            LOGIN
-        ========================================== */}
+        {/* Manager Registration */}
+        <Route path="/register-manager" element={<RegisterManager />} />
 
-        <Route
-          path="/"
-          element={<Login />}
-        />
+        {/* Manager Dashboard */}
+        <Route path="/dashboard" element={<Dashboard />} />
 
+        {/* Manager Employees */}
+        <Route path="/employees" element={<EmployeeList />} />
 
-        {/* ==========================================
-            MANAGER REGISTRATION
-        ========================================== */}
+        {/* Manager Attendance */}
+        <Route path="/manager-attendance" element={<ManagerAttendance />} />
 
-        <Route
-          path="/register-manager"
-          element={<RegisterManager />}
-        />
+        {/* Manager Profile */}
+        <Route path="/manager-profile" element={<ManagerProfile />} />
 
+        {/* Restaurants */}
+        <Route path="/restaurants" element={<RestaurantManagement />} />
 
-        {/* ==========================================
-            MANAGER DASHBOARD
-        ========================================== */}
+        {/* Reports */}
+        <Route path="/reports" element={<Reports />} />
 
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
+        {/* Settings */}
+        <Route path="/settings" element={<Settings />} />
 
+        {/* Employee Registration */}
+        <Route path="/register" element={<Register />} />
 
-        {/* ==========================================
-            EMPLOYEES
-        ========================================== */}
+        {/* Employee Dashboard */}
+        <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
 
-        <Route
-          path="/employees"
-          element={<EmployeeList />}
-        />
+        {/* Employee Attendance */}
+        <Route path="/employee-attendance" element={<EmployeeAttendance />} />
 
-
-        {/* ==========================================
-            MANAGER ATTENDANCE
-        ========================================== */}
-
-        <Route
-          path="/manager-attendance"
-          element={<ManagerAttendance />}
-        />
-
-
-        {/* ==========================================
-            RESTAURANTS
-        ========================================== */}
-
-        <Route
-          path="/restaurants"
-          element={<RestaurantManagement />}
-        />
-
-
-        {/* ==========================================
-            REPORTS
-        ========================================== */}
-
-        <Route
-          path="/reports"
-          element={<Reports />}
-        />
-
-
-        {/* ==========================================
-            SETTINGS
-        ========================================== */}
-
-        <Route
-          path="/settings"
-          element={<Settings />}
-        />
-
-
-        {/* ==========================================
-            EMPLOYEE REGISTRATION
-        ========================================== */}
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-
-        {/* ==========================================
-            EMPLOYEE DASHBOARD
-        ========================================== */}
-
-        <Route
-          path="/employee-dashboard"
-          element={<EmployeeDashboard />}
-        />
-
-
-        {/* ==========================================
-            EMPLOYEE ATTENDANCE
-        ========================================== */}
-
-        <Route
-          path="/employee-attendance"
-          element={<EmployeeAttendance />}
-        />
-
-
-        {/* ==========================================
-            EMPLOYEE PROFILE
-        ========================================== */}
-
-        <Route
-          path="/employee-profile"
-          element={<EmployeeProfile />}
-        />
-
+        {/* Employee Profile */}
+        <Route path="/employee-profile" element={<EmployeeProfile />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
 
 export default AppRoutes;
