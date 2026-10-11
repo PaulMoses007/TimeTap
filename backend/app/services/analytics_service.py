@@ -15,13 +15,13 @@ from app.schemas.analytics import (
     WorkforceInsight,
 )
 
-
 RIGA_TIMEZONE = ZoneInfo("Europe/Riga")
 
 
 # ============================================================
 # TIME HELPERS
 # ============================================================
+
 
 def to_riga_time(value):
     """
@@ -85,11 +85,7 @@ def _average_time(values):
     total_seconds = 0
 
     for value in values:
-        total_seconds += (
-            value.hour * 3600
-            + value.minute * 60
-            + value.second
-        )
+        total_seconds += value.hour * 3600 + value.minute * 60 + value.second
 
     average_seconds = total_seconds / len(values)
 
@@ -120,15 +116,9 @@ def _calculate_late_minutes(employee, check_in):
     if local_check_in is None:
         return 0
 
-    scheduled_minutes = (
-        shift_start.hour * 60
-        + shift_start.minute
-    )
+    scheduled_minutes = shift_start.hour * 60 + shift_start.minute
 
-    actual_minutes = (
-        local_check_in.hour * 60
-        + local_check_in.minute
-    )
+    actual_minutes = local_check_in.hour * 60 + local_check_in.minute
 
     late_minutes = actual_minutes - scheduled_minutes
 
@@ -138,6 +128,7 @@ def _calculate_late_minutes(employee, check_in):
 # ============================================================
 # EMPLOYEE ALERTS
 # ============================================================
+
 
 def _generate_employee_alerts(
     employee,
@@ -162,10 +153,7 @@ def _generate_employee_alerts(
         alerts.append(
             AdaptiveAlert(
                 employee_id=employee.employee_id,
-                employee_name=(
-                    f"{employee.first_name} "
-                    f"{employee.last_name}"
-                ),
+                employee_name=(f"{employee.first_name} " f"{employee.last_name}"),
                 alert_type="Low Attendance",
                 severity="error",
                 message=(
@@ -179,17 +167,11 @@ def _generate_employee_alerts(
     # REPEATED LATENESS
     # --------------------------------------------------------
 
-    if (
-        employee.schedule_type == "Fixed"
-        and late_arrivals >= 2
-    ):
+    if employee.schedule_type == "Fixed" and late_arrivals >= 2:
         alerts.append(
             AdaptiveAlert(
                 employee_id=employee.employee_id,
-                employee_name=(
-                    f"{employee.first_name} "
-                    f"{employee.last_name}"
-                ),
+                employee_name=(f"{employee.first_name} " f"{employee.last_name}"),
                 alert_type="Repeated Lateness",
                 severity="warning",
                 message=(
@@ -204,22 +186,15 @@ def _generate_employee_alerts(
     # SHORT SHIFTS
     # --------------------------------------------------------
 
-    if (
-        days_present >= 2
-        and average_shift_hours < 4
-    ):
+    if days_present >= 2 and average_shift_hours < 4:
         alerts.append(
             AdaptiveAlert(
                 employee_id=employee.employee_id,
-                employee_name=(
-                    f"{employee.first_name} "
-                    f"{employee.last_name}"
-                ),
+                employee_name=(f"{employee.first_name} " f"{employee.last_name}"),
                 alert_type="Short Shifts",
                 severity="warning",
                 message=(
-                    f"Average shift duration is "
-                    f"{average_shift_hours:.2f} hours."
+                    f"Average shift duration is " f"{average_shift_hours:.2f} hours."
                 ),
             )
         )
@@ -228,18 +203,11 @@ def _generate_employee_alerts(
     # FLEXIBLE ATTENDANCE PATTERN
     # --------------------------------------------------------
 
-    if (
-        employee.schedule_type == "Flexible"
-        and days_present >= 2
-        and average_check_in
-    ):
+    if employee.schedule_type == "Flexible" and days_present >= 2 and average_check_in:
         alerts.append(
             AdaptiveAlert(
                 employee_id=employee.employee_id,
-                employee_name=(
-                    f"{employee.first_name} "
-                    f"{employee.last_name}"
-                ),
+                employee_name=(f"{employee.first_name} " f"{employee.last_name}"),
                 alert_type="Attendance Pattern",
                 severity="info",
                 message=(
@@ -257,98 +225,81 @@ def _generate_employee_alerts(
 # ATTENDANCE ANALYTICS
 # ============================================================
 
+
 def get_attendance_analytics(
     db: Session,
     days: int = 30,
+    manager_id: int | None = None,
 ):
     """
     Generate employee attendance analytics for
     the requested number of previous days.
     """
 
-    current_date = datetime.now(
-        RIGA_TIMEZONE
-    ).date()
+    current_date = datetime.now(RIGA_TIMEZONE).date()
 
-    start_date = current_date - timedelta(
-        days=days - 1
+    start_date = current_date - timedelta(days=days - 1)
+
+    employees_query = db.query(Employee).filter(
+        Employee.is_active == True,
+        Employee.role != "Manager",
     )
 
-    employees = (
-        db.query(Employee)
-        .filter(
-            Employee.is_active == True,
-            Employee.role != "Manager",
+    if manager_id is not None:
+        employees_query = employees_query.join(
+            Restaurant, Employee.restaurant_id == Restaurant.id
+        ).filter(Restaurant.manager_id == manager_id)
+
+    employees = employees_query.all()
+
+    attendance_query = db.query(Attendance).filter(
+        Attendance.work_date >= start_date,
+        Attendance.work_date <= current_date,
+    )
+
+    if manager_id is not None:
+        attendance_query = (
+            attendance_query.join(Employee, Attendance.employee_id == Employee.id)
+            .join(Restaurant, Employee.restaurant_id == Restaurant.id)
+            .filter(Restaurant.manager_id == manager_id)
         )
-        .all()
-    )
 
-    attendance_records = (
-        db.query(Attendance)
-        .filter(
-            Attendance.work_date >= start_date,
-            Attendance.work_date <= current_date,
-        )
-        .all()
-    )
+    attendance_records = attendance_query.all()
 
     attendance_by_employee = {}
 
     for record in attendance_records:
-        attendance_by_employee.setdefault(
-            record.employee_id,
-            []
-        ).append(record)
+        attendance_by_employee.setdefault(record.employee_id, []).append(record)
 
     employee_analytics = []
     all_alerts = []
 
-    total_attendance_records = len(
-        attendance_records
-    )
+    total_attendance_records = len(attendance_records)
 
     total_worked_minutes = sum(
-        record.worked_minutes or 0
-        for record in attendance_records
+        record.worked_minutes or 0 for record in attendance_records
     )
 
     employees_with_attendance = 0
 
     for employee in employees:
 
-        records = attendance_by_employee.get(
-            employee.id,
-            []
-        )
+        records = attendance_by_employee.get(employee.id, [])
 
         if records:
             employees_with_attendance += 1
 
         days_present = len(records)
 
-        worked_minutes = sum(
-            record.worked_minutes or 0
-            for record in records
-        )
+        worked_minutes = sum(record.worked_minutes or 0 for record in records)
 
         worked_hours = worked_minutes / 60
 
-        average_shift_hours = (
-            worked_hours / days_present
-            if days_present > 0
-            else 0
-        )
+        average_shift_hours = worked_hours / days_present if days_present > 0 else 0
 
-        attendance_rate = (
-            (days_present / days) * 100
-            if days > 0
-            else 0
-        )
+        attendance_rate = (days_present / days) * 100 if days > 0 else 0
 
-        attendance_rate = min(
-            max(attendance_rate, 0),
-            100
-        )
+        attendance_rate = min(max(attendance_rate, 0), 100)
 
         check_in_times = []
         check_out_times = []
@@ -358,23 +309,15 @@ def get_attendance_analytics(
 
         for record in records:
 
-            local_check_in = to_riga_time(
-                record.check_in
-            )
+            local_check_in = to_riga_time(record.check_in)
 
-            local_check_out = to_riga_time(
-                record.check_out
-            )
+            local_check_out = to_riga_time(record.check_out)
 
             if local_check_in:
-                check_in_times.append(
-                    local_check_in.time()
-                )
+                check_in_times.append(local_check_in.time())
 
             if local_check_out:
-                check_out_times.append(
-                    local_check_out.time()
-                )
+                check_out_times.append(local_check_out.time())
 
             late_minutes = _calculate_late_minutes(
                 employee,
@@ -385,18 +328,12 @@ def get_attendance_analytics(
                 late_arrivals += 1
                 total_late_minutes += late_minutes
 
-        average_check_in = _average_time(
-            check_in_times
-        )
+        average_check_in = _average_time(check_in_times)
 
-        average_check_out = _average_time(
-            check_out_times
-        )
+        average_check_out = _average_time(check_out_times)
 
         average_late_minutes = (
-            total_late_minutes / late_arrivals
-            if late_arrivals > 0
-            else 0
+            total_late_minutes / late_arrivals if late_arrivals > 0 else 0
         )
 
         restaurant_name = "Not assigned"
@@ -405,9 +342,7 @@ def get_attendance_analytics(
 
             restaurant = (
                 db.query(Restaurant)
-                .filter(
-                    Restaurant.id == employee.restaurant_id
-                )
+                .filter(Restaurant.id == employee.restaurant_id)
                 .first()
             )
 
@@ -433,39 +368,26 @@ def get_attendance_analytics(
                 last_name=employee.last_name,
                 role=employee.role,
                 restaurant=restaurant_name,
-
-                schedule_type=(
-                    employee.schedule_type
-                    or "Flexible"
-                ),
-
+                schedule_type=(employee.schedule_type or "Flexible"),
                 shift_start=employee.shift_start,
                 shift_end=employee.shift_end,
-
                 days_present=days_present,
-
                 total_worked_minutes=worked_minutes,
-
                 total_worked_hours=round(
                     worked_hours,
                     2,
                 ),
-
                 average_shift_hours=round(
                     average_shift_hours,
                     2,
                 ),
-
                 attendance_rate=round(
                     attendance_rate,
                     2,
                 ),
-
                 average_check_in=average_check_in,
                 average_check_out=average_check_out,
-
                 late_arrivals=late_arrivals,
-
                 average_late_minutes=round(
                     average_late_minutes,
                     2,
@@ -473,9 +395,7 @@ def get_attendance_analytics(
             )
         )
 
-    total_worked_hours = (
-        total_worked_minutes / 60
-    )
+    total_worked_hours = total_worked_minutes / 60
 
     average_shift_hours = (
         total_worked_hours / total_attendance_records
@@ -484,57 +404,35 @@ def get_attendance_analytics(
     )
 
     average_attendance_rate = (
-        sum(
-            employee.attendance_rate
-            for employee in employee_analytics
-        )
+        sum(employee.attendance_rate for employee in employee_analytics)
         / len(employee_analytics)
         if employee_analytics
         else 0
     )
 
     employees_with_low_attendance = sum(
-        1
-        for employee in employee_analytics
-        if employee.attendance_rate < 50
+        1 for employee in employee_analytics if employee.attendance_rate < 50
     )
 
     return AnalyticsSummary(
         total_employees=len(employees),
-
-        employees_with_attendance=(
-            employees_with_attendance
-        ),
-
-        total_attendance_records=(
-            total_attendance_records
-        ),
-
-        total_worked_minutes=(
-            total_worked_minutes
-        ),
-
+        employees_with_attendance=(employees_with_attendance),
+        total_attendance_records=(total_attendance_records),
+        total_worked_minutes=(total_worked_minutes),
         total_worked_hours=round(
             total_worked_hours,
             2,
         ),
-
         average_shift_hours=round(
             average_shift_hours,
             2,
         ),
-
         average_attendance_rate=round(
             average_attendance_rate,
             2,
         ),
-
-        employees_with_low_attendance=(
-            employees_with_low_attendance
-        ),
-
+        employees_with_low_attendance=(employees_with_low_attendance),
         employees=employee_analytics,
-
         alerts=all_alerts,
     )
 
@@ -543,63 +441,54 @@ def get_attendance_analytics(
 # ATTENDANCE TREND
 # ============================================================
 
+
 def get_attendance_trend(
     db: Session,
     days: int = 30,
+    manager_id: int | None = None,
 ):
     """
     Generate daily attendance trends.
     """
 
-    current_date = datetime.now(
-        RIGA_TIMEZONE
-    ).date()
+    current_date = datetime.now(RIGA_TIMEZONE).date()
 
-    start_date = current_date - timedelta(
-        days=days - 1
+    start_date = current_date - timedelta(days=days - 1)
+
+    attendance_query = db.query(Attendance).filter(
+        Attendance.work_date >= start_date,
+        Attendance.work_date <= current_date,
     )
 
-    attendance_records = (
-        db.query(Attendance)
-        .filter(
-            Attendance.work_date >= start_date,
-            Attendance.work_date <= current_date,
+    if manager_id is not None:
+        attendance_query = (
+            attendance_query.join(Employee, Attendance.employee_id == Employee.id)
+            .join(Restaurant, Employee.restaurant_id == Restaurant.id)
+            .filter(Restaurant.manager_id == manager_id)
         )
-        .all()
-    )
+
+    attendance_records = attendance_query.all()
 
     trends = []
 
     for day_offset in range(days):
 
-        trend_date = (
-            start_date
-            + timedelta(days=day_offset)
-        )
+        trend_date = start_date + timedelta(days=day_offset)
 
         daily_records = [
-            record
-            for record in attendance_records
-            if record.work_date == trend_date
+            record for record in attendance_records if record.work_date == trend_date
         ]
 
-        attendance_count = len(
-            daily_records
-        )
+        attendance_count = len(daily_records)
 
         total_worked_minutes = sum(
-            record.worked_minutes or 0
-            for record in daily_records
+            record.worked_minutes or 0 for record in daily_records
         )
 
-        total_worked_hours = (
-            total_worked_minutes / 60
-        )
+        total_worked_hours = total_worked_minutes / 60
 
         average_worked_hours = (
-            total_worked_hours / attendance_count
-            if attendance_count > 0
-            else 0
+            total_worked_hours / attendance_count if attendance_count > 0 else 0
         )
 
         daily_late_arrivals = 0
@@ -607,20 +496,14 @@ def get_attendance_trend(
         for record in daily_records:
 
             employee = (
-                db.query(Employee)
-                .filter(
-                    Employee.id == record.employee_id
-                )
-                .first()
+                db.query(Employee).filter(Employee.id == record.employee_id).first()
             )
 
             if employee:
 
-                late_minutes = (
-                    _calculate_late_minutes(
-                        employee,
-                        record.check_in,
-                    )
+                late_minutes = _calculate_late_minutes(
+                    employee,
+                    record.check_in,
                 )
 
                 if late_minutes > 0:
@@ -629,24 +512,16 @@ def get_attendance_trend(
         trends.append(
             AttendanceTrend(
                 date=trend_date.isoformat(),
-
-                attendance_count=(
-                    attendance_count
-                ),
-
+                attendance_count=(attendance_count),
                 total_worked_hours=round(
                     total_worked_hours,
                     2,
                 ),
-
                 average_worked_hours=round(
                     average_worked_hours,
                     2,
                 ),
-
-                late_arrivals=(
-                    daily_late_arrivals
-                ),
+                late_arrivals=(daily_late_arrivals),
             )
         )
 
@@ -657,9 +532,11 @@ def get_attendance_trend(
 # WORKFORCE ADAPTIVE INSIGHTS
 # ============================================================
 
+
 def get_workforce_insights(
     db: Session,
     days: int = 14,
+    manager_id: int | None = None,
 ):
     """
     Compare recent workforce activity against
@@ -669,73 +546,66 @@ def get_workforce_insights(
     the previous period has enough baseline data.
     """
 
-    current_date = datetime.now(
-        RIGA_TIMEZONE
-    ).date()
+    current_date = datetime.now(RIGA_TIMEZONE).date()
 
     # --------------------------------------------------------
     # PERIOD DEFINITIONS
     # --------------------------------------------------------
 
-    recent_start = (
-        current_date
-        - timedelta(days=days - 1)
-    )
+    recent_start = current_date - timedelta(days=days - 1)
 
-    previous_end = (
-        recent_start
-        - timedelta(days=1)
-    )
+    previous_end = recent_start - timedelta(days=1)
 
-    previous_start = (
-        previous_end
-        - timedelta(days=days - 1)
-    )
+    previous_start = previous_end - timedelta(days=days - 1)
 
     # --------------------------------------------------------
     # GET RECENT RECORDS
     # --------------------------------------------------------
 
-    recent_records = (
-        db.query(Attendance)
-        .filter(
-            Attendance.work_date >= recent_start,
-            Attendance.work_date <= current_date,
-        )
-        .all()
+    recent_query = db.query(Attendance).filter(
+        Attendance.work_date >= recent_start,
+        Attendance.work_date <= current_date,
     )
+
+    if manager_id is not None:
+        recent_query = (
+            recent_query.join(Employee, Attendance.employee_id == Employee.id)
+            .join(Restaurant, Employee.restaurant_id == Restaurant.id)
+            .filter(Restaurant.manager_id == manager_id)
+        )
+
+    recent_records = recent_query.all()
 
     # --------------------------------------------------------
     # GET PREVIOUS RECORDS
     # --------------------------------------------------------
 
-    previous_records = (
-        db.query(Attendance)
-        .filter(
-            Attendance.work_date >= previous_start,
-            Attendance.work_date <= previous_end,
-        )
-        .all()
+    previous_query = db.query(Attendance).filter(
+        Attendance.work_date >= previous_start,
+        Attendance.work_date <= previous_end,
     )
+
+    if manager_id is not None:
+        previous_query = (
+            previous_query.join(Employee, Attendance.employee_id == Employee.id)
+            .join(Restaurant, Employee.restaurant_id == Restaurant.id)
+            .filter(Restaurant.manager_id == manager_id)
+        )
+
+    previous_records = previous_query.all()
 
     # --------------------------------------------------------
     # RECENT ATTENDANCE
     # --------------------------------------------------------
 
-    recent_attendance = len(
-        recent_records
-    )
+    recent_attendance = len(recent_records)
 
     # --------------------------------------------------------
     # RECENT WORKED HOURS
     # --------------------------------------------------------
 
     recent_worked_hours = (
-        sum(
-            record.worked_minutes or 0
-            for record in recent_records
-        )
-        / 60
+        sum(record.worked_minutes or 0 for record in recent_records) / 60
     )
 
     # --------------------------------------------------------
@@ -746,21 +616,13 @@ def get_workforce_insights(
 
     for record in recent_records:
 
-        employee = (
-            db.query(Employee)
-            .filter(
-                Employee.id == record.employee_id
-            )
-            .first()
-        )
+        employee = db.query(Employee).filter(Employee.id == record.employee_id).first()
 
         if employee:
 
-            late_minutes = (
-                _calculate_late_minutes(
-                    employee,
-                    record.check_in,
-                )
+            late_minutes = _calculate_late_minutes(
+                employee,
+                record.check_in,
             )
 
             if late_minutes > 0:
@@ -770,20 +632,14 @@ def get_workforce_insights(
     # PREVIOUS ATTENDANCE
     # --------------------------------------------------------
 
-    previous_attendance = len(
-        previous_records
-    )
+    previous_attendance = len(previous_records)
 
     # --------------------------------------------------------
     # PREVIOUS WORKED HOURS
     # --------------------------------------------------------
 
     previous_worked_hours = (
-        sum(
-            record.worked_minutes or 0
-            for record in previous_records
-        )
-        / 60
+        sum(record.worked_minutes or 0 for record in previous_records) / 60
     )
 
     # --------------------------------------------------------
@@ -794,21 +650,13 @@ def get_workforce_insights(
 
     for record in previous_records:
 
-        employee = (
-            db.query(Employee)
-            .filter(
-                Employee.id == record.employee_id
-            )
-            .first()
-        )
+        employee = db.query(Employee).filter(Employee.id == record.employee_id).first()
 
         if employee:
 
-            late_minutes = (
-                _calculate_late_minutes(
-                    employee,
-                    record.check_in,
-                )
+            late_minutes = _calculate_late_minutes(
+                employee,
+                record.check_in,
             )
 
             if late_minutes > 0:
@@ -840,30 +688,20 @@ def get_workforce_insights(
                     "attendance data for a reliable "
                     "percentage comparison."
                 ),
-                metric=float(
-                    recent_attendance
-                ),
+                metric=float(recent_attendance),
             )
         )
 
     else:
 
-        recent_daily_average = (
-            recent_attendance / days
-        )
+        recent_daily_average = recent_attendance / days
 
-        previous_daily_average = (
-            previous_attendance / days
-        )
+        previous_daily_average = previous_attendance / days
 
         if previous_daily_average > 0:
 
             attendance_change = (
-                (
-                    recent_daily_average
-                    - previous_daily_average
-                )
-                / previous_daily_average
+                (recent_daily_average - previous_daily_average) / previous_daily_average
             ) * 100
 
             if abs(attendance_change) >= 5:
@@ -872,13 +710,9 @@ def get_workforce_insights(
 
                     insights.append(
                         WorkforceInsight(
-                            insight_type=(
-                                "Attendance Increase"
-                            ),
+                            insight_type=("Attendance Increase"),
                             severity="info",
-                            title=(
-                                "Attendance activity increased"
-                            ),
+                            title=("Attendance activity increased"),
                             message=(
                                 "Daily attendance activity "
                                 f"increased by "
@@ -897,13 +731,9 @@ def get_workforce_insights(
 
                     insights.append(
                         WorkforceInsight(
-                            insight_type=(
-                                "Attendance Decrease"
-                            ),
+                            insight_type=("Attendance Decrease"),
                             severity="warning",
-                            title=(
-                                "Attendance activity decreased"
-                            ),
+                            title=("Attendance activity decreased"),
                             message=(
                                 "Daily attendance activity "
                                 f"decreased by "
@@ -966,22 +796,14 @@ def get_workforce_insights(
 
     else:
 
-        recent_daily_hours = (
-            recent_worked_hours / days
-        )
+        recent_daily_hours = recent_worked_hours / days
 
-        previous_daily_hours = (
-            previous_worked_hours / days
-        )
+        previous_daily_hours = previous_worked_hours / days
 
         if previous_daily_hours > 0:
 
             worked_hours_change = (
-                (
-                    recent_daily_hours
-                    - previous_daily_hours
-                )
-                / previous_daily_hours
+                (recent_daily_hours - previous_daily_hours) / previous_daily_hours
             ) * 100
 
             if abs(worked_hours_change) >= 20:
@@ -990,13 +812,9 @@ def get_workforce_insights(
 
                     insights.append(
                         WorkforceInsight(
-                            insight_type=(
-                                "Worked Hours Increase"
-                            ),
+                            insight_type=("Worked Hours Increase"),
                             severity="info",
-                            title=(
-                                "Worked hours increased"
-                            ),
+                            title=("Worked hours increased"),
                             message=(
                                 "Daily worked hours "
                                 f"increased by "
@@ -1015,13 +833,9 @@ def get_workforce_insights(
 
                     insights.append(
                         WorkforceInsight(
-                            insight_type=(
-                                "Worked Hours Decrease"
-                            ),
+                            insight_type=("Worked Hours Decrease"),
                             severity="warning",
-                            title=(
-                                "Worked hours decreased"
-                            ),
+                            title=("Worked hours decreased"),
                             message=(
                                 "Daily worked hours "
                                 f"decreased by "
@@ -1040,13 +854,9 @@ def get_workforce_insights(
 
                 insights.append(
                     WorkforceInsight(
-                        insight_type=(
-                            "Worked Hours Stable"
-                        ),
+                        insight_type=("Worked Hours Stable"),
                         severity="info",
-                        title=(
-                            "Worked hours are stable"
-                        ),
+                        title=("Worked hours are stable"),
                         message=(
                             "Daily worked hours changed by only "
                             f"{abs(worked_hours_change):.2f}% "
@@ -1084,20 +894,14 @@ def get_workforce_insights(
                         "The previous period has no "
                         "late-arrival baseline."
                     ),
-                    metric=float(
-                        recent_late_arrivals
-                    ),
+                    metric=float(recent_late_arrivals),
                 )
             )
 
     else:
 
         lateness_change = (
-            (
-                recent_late_arrivals
-                - previous_late_arrivals
-            )
-            / previous_late_arrivals
+            (recent_late_arrivals - previous_late_arrivals) / previous_late_arrivals
         ) * 100
 
         if abs(lateness_change) >= 20:
@@ -1106,9 +910,7 @@ def get_workforce_insights(
 
                 insights.append(
                     WorkforceInsight(
-                        insight_type=(
-                            "Lateness Increase"
-                        ),
+                        insight_type=("Lateness Increase"),
                         severity="warning",
                         title="Late arrivals increased",
                         message=(
@@ -1128,9 +930,7 @@ def get_workforce_insights(
 
                 insights.append(
                     WorkforceInsight(
-                        insight_type=(
-                            "Lateness Decrease"
-                        ),
+                        insight_type=("Lateness Decrease"),
                         severity="info",
                         title="Late arrivals decreased",
                         message=(
@@ -1150,9 +950,7 @@ def get_workforce_insights(
 
             insights.append(
                 WorkforceInsight(
-                    insight_type=(
-                        "Lateness Stable"
-                    ),
+                    insight_type=("Lateness Stable"),
                     severity="info",
                     title="Late arrivals are stable",
                     message=(

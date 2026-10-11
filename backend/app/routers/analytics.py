@@ -45,9 +45,12 @@ def attendance_analytics(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+    manager_id = current_user["id"]
+
     return get_attendance_analytics(
         db,
-        days=30
+        days=30,
+        manager_id=manager_id
     )
 
 
@@ -63,9 +66,12 @@ def attendance_trend(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+    manager_id = current_user["id"]
+
     return get_attendance_trend(
         db,
-        days=30
+        days=30,
+        manager_id=manager_id
     )
 
 
@@ -81,7 +87,10 @@ def workforce_insights(
     db: Session = Depends(get_db),
     current_user=Depends(require_manager)
 ):
+    manager_id = current_user["id"]
+
     return get_workforce_insights(
         db,
-        days=14
+        days=14,
+        manager_id=manager_id
     )
