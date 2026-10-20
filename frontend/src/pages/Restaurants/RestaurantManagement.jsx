@@ -32,6 +32,8 @@ import {
 
 import ManagerSidebar from "../../components/ManagerSidebar";
 
+import api from "../../api/axios";
+
 
 function RestaurantManagement() {
   const [restaurants, setRestaurants] = useState([]);
@@ -54,6 +56,9 @@ function RestaurantManagement() {
 
   const [selectedRestaurant, setSelectedRestaurant] =
     useState(null);
+
+  const [qrImageUrl, setQrImageUrl] =
+    useState("");
 
   const [copiedRestaurantId, setCopiedRestaurantId] =
     useState(null);
@@ -188,15 +193,49 @@ function RestaurantManagement() {
   // OPEN ATTENDANCE QR
   // ==================================================
 
-  const handleOpenQr = (
-    restaurant
-  ) => {
+  const handleOpenQr = async (restaurant) => {
 
-    setSelectedRestaurant(
-      restaurant
-    );
+    try {
 
-    setQrDialogOpen(true);
+      setError("");
+
+      setSelectedRestaurant(
+        restaurant
+      );
+
+      setQrImageUrl("");
+
+      setQrDialogOpen(true);
+
+      const response = await api.get(
+        `/restaurants/${restaurant.id}/qr`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      const imageUrl =
+        URL.createObjectURL(
+          response.data
+        );
+
+      setQrImageUrl(imageUrl);
+
+    } catch (err) {
+
+      console.error(
+        "Failed to load attendance QR:",
+        err
+      );
+
+      setError(
+        err.response?.data?.detail ||
+        "Failed to load attendance QR."
+      );
+
+      setQrDialogOpen(false);
+
+    }
   };
 
 
@@ -209,6 +248,16 @@ function RestaurantManagement() {
     setQrDialogOpen(false);
 
     setSelectedRestaurant(null);
+
+    if (qrImageUrl) {
+
+      URL.revokeObjectURL(
+        qrImageUrl
+      );
+
+      setQrImageUrl("");
+
+    }
   };
 
 
@@ -218,7 +267,10 @@ function RestaurantManagement() {
 
   const handleDownloadQr = () => {
 
-    if (!selectedRestaurant) {
+    if (
+      !selectedRestaurant ||
+      !qrImageUrl
+    ) {
       return;
     }
 
@@ -226,16 +278,20 @@ function RestaurantManagement() {
       document.createElement("a");
 
     link.href =
-      `/api/restaurants/${selectedRestaurant.id}/qr`;
+      qrImageUrl;
 
     link.download =
       `restaurant_${selectedRestaurant.id}.png`;
 
-    document.body.appendChild(link);
+    document.body.appendChild(
+      link
+    );
 
     link.click();
 
-    document.body.removeChild(link);
+    document.body.removeChild(
+      link
+    );
   };
 
 
@@ -314,7 +370,6 @@ function RestaurantManagement() {
           maxWidth="xl"
           sx={{
             py: 4,
-
             px: {
               xs: 2,
               md: 4,
@@ -395,10 +450,8 @@ function RestaurantManagement() {
               elevation={0}
               sx={{
                 mb: 4,
-
                 border:
                   "1px solid #e4e7eb",
-
                 borderRadius: 3,
               }}
             >
@@ -422,12 +475,10 @@ function RestaurantManagement() {
                   <Box
                     sx={{
                       display: "grid",
-
                       gridTemplateColumns: {
                         xs: "1fr",
                         md: "1fr 1fr",
                       },
-
                       gap: 2,
                     }}
                   >
@@ -529,7 +580,9 @@ function RestaurantManagement() {
                 py: 8,
               }}
             >
+
               <CircularProgress />
+
             </Box>
 
           ) : restaurants.length === 0 ? (
@@ -543,10 +596,8 @@ function RestaurantManagement() {
               sx={{
                 p: 6,
                 textAlign: "center",
-
                 border:
                   "1px solid #e4e7eb",
-
                 borderRadius: 3,
               }}
             >
@@ -604,13 +655,11 @@ function RestaurantManagement() {
             <Box
               sx={{
                 display: "grid",
-
                 gridTemplateColumns: {
                   xs: "1fr",
                   md: "1fr 1fr",
                   lg: "1fr 1fr 1fr",
                 },
-
                 gap: 3,
               }}
             >
@@ -624,7 +673,6 @@ function RestaurantManagement() {
                     sx={{
                       border:
                         "1px solid #e4e7eb",
-
                       borderRadius: 3,
                     }}
                   >
@@ -641,12 +689,9 @@ function RestaurantManagement() {
                         sx={{
                           display:
                             "flex",
-
                           alignItems:
                             "center",
-
                           gap: 2,
-
                           mb: 3,
                         }}
                       >
@@ -655,7 +700,6 @@ function RestaurantManagement() {
                           sx={{
                             bgcolor:
                               "primary.light",
-
                             color:
                               "primary.main",
                           }}
@@ -741,13 +785,10 @@ function RestaurantManagement() {
                           mt: 2,
                           mb: 2,
                           p: 2,
-
                           bgcolor:
                             "#f5f9ff",
-
                           border:
                             "1px solid #dbeafe",
-
                           borderRadius: 2,
                         }}
                       >
@@ -791,13 +832,10 @@ function RestaurantManagement() {
                               flexGrow: 1,
                               px: 1.5,
                               py: 1,
-
                               bgcolor:
                                 "white",
-
                               border:
                                 "1px solid #d1d5db",
-
                               borderRadius: 1.5,
                             }}
                           >
@@ -855,7 +893,6 @@ function RestaurantManagement() {
                         sx={{
                           display: "flex",
                           gap: 1,
-
                           flexDirection: {
                             xs: "column",
                             sm: "row",
@@ -940,8 +977,7 @@ function RestaurantManagement() {
                 display: "flex",
                 flexDirection:
                   "column",
-                alignItems:
-                  "center",
+                alignItems: "center",
                 py: 2,
               }}
             >
@@ -966,27 +1002,51 @@ function RestaurantManagement() {
               </Typography>
 
 
-              <Box
-                component="img"
-                src={
-                  `/api/restaurants/${selectedRestaurant.id}/qr`
-                }
-                alt={`${selectedRestaurant.name} Attendance QR Code`}
-                sx={{
-                  width: 300,
-                  height: 300,
-                  objectFit: "contain",
+              {/* ==========================================
+                  AUTHENTICATED QR IMAGE
+              =========================================== */}
 
-                  border:
-                    "1px solid #e4e7eb",
+              {qrImageUrl ? (
 
-                  borderRadius: 2,
+                <Box
+                  component="img"
+                  src={qrImageUrl}
+                  alt={`${selectedRestaurant.name} Attendance QR Code`}
+                  sx={{
+                    width: 300,
+                    height: 300,
+                    objectFit: "contain",
+                    border:
+                      "1px solid #e4e7eb",
+                    borderRadius: 2,
+                    p: 2,
+                    bgcolor: "white",
+                  }}
+                />
 
-                  p: 2,
+              ) : (
 
-                  bgcolor: "white",
-                }}
-              />
+                <Box
+                  sx={{
+                    width: 300,
+                    height: 300,
+                    display: "flex",
+                    alignItems:
+                      "center",
+                    justifyContent:
+                      "center",
+                    border:
+                      "1px solid #e4e7eb",
+                    borderRadius: 2,
+                    bgcolor: "white",
+                  }}
+                >
+
+                  <CircularProgress />
+
+                </Box>
+
+              )}
 
 
               <Typography
@@ -1030,6 +1090,7 @@ function RestaurantManagement() {
             onClick={
               handleDownloadQr
             }
+            disabled={!qrImageUrl}
           >
             Download QR Code
           </Button>
