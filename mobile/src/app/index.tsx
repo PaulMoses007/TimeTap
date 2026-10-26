@@ -1,5 +1,12 @@
 
-import { StyleSheet, Text, View, Pressable, ScrollView } from 'react-native';
+import { router } from 'expo-router';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
@@ -20,7 +27,7 @@ export default function HomeScreen() {
 
         <Pressable
           style={styles.primaryButton}
-          onPress={() => {}}
+          onPress={() => router.push('/login')}
           accessibilityRole="button"
         >
           <Text style={styles.primaryButtonText}>Log in</Text>
@@ -28,7 +35,9 @@ export default function HomeScreen() {
 
         <Pressable
           style={styles.secondaryButton}
-          onPress={() => {}}
+          onPress={() =>
+            alert('Account registration will be added next.')
+          }
           accessibilityRole="button"
         >
           <Text style={styles.secondaryButtonText}>Create an account</Text>
@@ -37,11 +46,14 @@ export default function HomeScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Your workday, in one place</Text>
           <Text style={styles.infoText}>
-            Check in, check out, and track working hours with your restaurant team.
+            Check in, check out, and track working hours with your
+            restaurant team.
           </Text>
         </View>
 
-        <Text style={styles.footer}>TIMETAP · ATTENDANCE MANAGEMENT</Text>
+        <Text style={styles.footer}>
+          TIMETAP · ATTENDANCE MANAGEMENT
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
