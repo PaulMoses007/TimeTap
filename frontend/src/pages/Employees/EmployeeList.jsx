@@ -33,6 +33,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 import {
   createEmployee,
@@ -40,6 +41,7 @@ import {
   approveEmployee,
   rejectEmployee,
   updateEmployee,
+  getEmployeeAttendance,
 } from "../../services/employeeService";
 
 import { getRestaurants } from "../../services/restaurantService";
@@ -64,6 +66,12 @@ function EmployeeList() {
   const [editRestaurantId, setEditRestaurantId] = useState("");
 
   const [successMessage, setSuccessMessage] = useState("");
+
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceError, setAttendanceError] = useState("");
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -381,6 +389,31 @@ function EmployeeList() {
 
 
   // --------------------------------------------------
+  // View Employee Attendance
+  // --------------------------------------------------
+
+  const handleViewAttendance = async (employee) => {
+    setSelectedEmployee(employee);
+    setAttendanceDialogOpen(true);
+    setAttendanceLoading(true);
+    setAttendanceError("");
+    setAttendanceRecords([]);
+
+    try {
+      const records = await getEmployeeAttendance(employee.id);
+      setAttendanceRecords(Array.isArray(records) ? records : []);
+    } catch (err) {
+      console.error(err);
+      setAttendanceError(
+        err.response?.data?.detail ||
+          "Failed to load employee attendance."
+      );
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  // --------------------------------------------------
   // Loading
   // --------------------------------------------------
 
@@ -662,6 +695,18 @@ function EmployeeList() {
                                 gap: 0.5,
                               }}
                             >
+
+                              {/* VIEW ATTENDANCE */}
+
+                              <Tooltip title="View employee attendance">
+                                <IconButton
+                                  color="info"
+                                  onClick={() => handleViewAttendance(employee)}
+                                  aria-label={`View attendance for ${employee.first_name}`}
+                                >
+                                  <AccessTimeIcon />
+                                </IconButton>
+                              </Tooltip>
 
                               {/* EDIT */}
 
@@ -1080,6 +1125,131 @@ function EmployeeList() {
 
         </Dialog>
 
+
+        {/* EMPLOYEE ATTENDANCE HISTORY DIALOG */}
+
+        <Dialog
+          open={attendanceDialogOpen}
+          onClose={() => setAttendanceDialogOpen(false)}
+          fullWidth
+          maxWidth="md"
+        >
+          <DialogTitle>
+            Attendance History
+            {selectedEmployee && (
+              <Typography variant="subtitle2" color="text.secondary">
+                {selectedEmployee.first_name} {selectedEmployee.last_name}
+                {" — "}
+                {selectedEmployee.employee_id || selectedEmployee.email}
+              </Typography>
+            )}
+          </DialogTitle>
+
+          <DialogContent>
+            {attendanceLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+                <CircularProgress />
+              </Box>
+            ) : attendanceError ? (
+              <Alert severity="error" sx={{ my: 2 }}>
+                {attendanceError}
+              </Alert>
+            ) : attendanceRecords.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 3 }}>
+                No attendance records found for this employee.
+              </Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Date</strong></TableCell>
+                      <TableCell><strong>Check In</strong></TableCell>
+                      <TableCell><strong>Check Out</strong></TableCell>
+                      <TableCell><strong>Hours Worked</strong></TableCell>
+                      <TableCell><strong>Status</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+
+                  <TableBody>
+                    {attendanceRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>
+                          {record.work_date
+                            ? new Date(`${record.work_date}T12:00:00`).toLocaleDateString()
+                            : "-"}
+                        </TableCell>
+
+                        <TableCell>
+                          {record.check_in
+                            ? new Date(record.check_in).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "-"}
+                        </TableCell>
+
+                        <TableCell>
+                          {record.check_out
+                            ? new Date(record.check_out).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Not checked out"}
+                        </TableCell>
+
+                        <TableCell>
+                          {(() => {
+  const minutes =
+    record.worked_minutes != null
+      ? Number(record.worked_minutes)
+      : record.worked_hours != null
+        ? Math.round(Number(record.worked_hours) * 60)
+        : null;
+
+  if (minutes == null || !Number.isFinite(minutes)) {
+    return "-";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  }
+
+  return `${hours} ${hours === 1 ? "hour" : "hours"} ${remainingMinutes} min`;
+})()}
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={
+                              record.status ||
+                              (record.check_out ? "Completed" : "Working")
+                            }
+                            color={record.check_out ? "success" : "warning"}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </DialogContent>
+
+          <DialogActions>
+            <Button onClick={() => setAttendanceDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* SUCCESS MESSAGE */}
 

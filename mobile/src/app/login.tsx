@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import {
   Alert,
@@ -10,12 +9,13 @@ import {
   TextInput,
   View,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://tiny-badgers-ring.loca.lt';
+const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -45,10 +45,8 @@ export default function LoginScreen() {
       });
 
       const responseText = await response.text();
-      console.log('Login HTTP status:', response.status);
-      console.log('Login response:', responseText);
-
       let data: any;
+
       try {
         data = JSON.parse(responseText);
       } catch {
@@ -74,10 +72,7 @@ export default function LoginScreen() {
         return;
       }
 
-      await SecureStore.setItemAsync(
-        'timetap_access_token',
-        data.access_token,
-      );
+      await SecureStore.setItemAsync('timetap_access_token', data.access_token);
 
       const profileResponse = await fetch(`${API_BASE_URL}/employees/me`, {
         method: 'GET',
@@ -89,13 +84,12 @@ export default function LoginScreen() {
       });
 
       const profileText = await profileResponse.text();
-      console.log('Profile HTTP status:', profileResponse.status);
-      console.log('Profile response:', profileText);
-
       let profile: any;
+
       try {
         profile = JSON.parse(profileText);
       } catch {
+        await SecureStore.deleteItemAsync('timetap_access_token');
         Alert.alert('Profile error', 'The server returned an invalid profile response.');
         return;
       }
@@ -116,7 +110,6 @@ export default function LoginScreen() {
       if (role === 'manager') {
         router.replace('/manager-dashboard');
       } else {
-        // Roles such as DishWasher, Chef, Server, etc. are employees.
         router.replace('/employee-dashboard');
       }
     } catch (error) {
@@ -136,16 +129,14 @@ export default function LoginScreen() {
         style={styles.keyboard}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Pressable onPress={() => router.back()} accessibilityRole="button">
             <Text style={styles.back}>‹ Back</Text>
           </Pressable>
 
           <Text style={styles.brand}>TimeTap</Text>
           <Text style={styles.heading}>Welcome back</Text>
-          <Text style={styles.subtitle}>
-            Log in to your restaurant account.
-          </Text>
+          <Text style={styles.subtitle}>Log in to your restaurant account.</Text>
 
           <Text style={styles.label}>Email address</Text>
           <TextInput
@@ -153,6 +144,7 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
+            placeholderTextColor="#94A3B8"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -166,6 +158,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="Enter your password"
+            placeholderTextColor="#94A3B8"
             secureTextEntry
             textContentType="password"
             editable={!loading}
@@ -177,17 +170,24 @@ export default function LoginScreen() {
             disabled={loading}
             accessibilityRole="button"
           >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.buttonText}>Log in</Text>
-            )}
+            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Log in</Text>}
           </Pressable>
 
-          <Text style={styles.note}>
-            Managers and employees use the same login screen.
-          </Text>
-        </View>
+          <Text style={styles.note}>Managers and employees use the same login screen.</Text>
+
+          <View style={styles.registerPanel}>
+            <Text style={styles.registerHeading}>New to TimeTap?</Text>
+            <Text style={styles.registerDescription}>Create an account to get started.</Text>
+
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => router.push('/register')}
+              accessibilityRole="button"
+            >
+              <Text style={styles.secondaryButtonText}>Create an account</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -196,27 +196,12 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F7F8FC' },
   keyboard: { flex: 1 },
-  container: { flex: 1, padding: 24, justifyContent: 'center' },
+  container: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   back: { color: '#2463EB', fontSize: 17, marginBottom: 32 },
   brand: { color: '#173D75', fontSize: 32, fontWeight: '800' },
-  heading: {
-    color: '#172033',
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 24,
-  },
-  subtitle: {
-    color: '#64748B',
-    fontSize: 16,
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  label: {
-    color: '#172033',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
+  heading: { color: '#172033', fontSize: 28, fontWeight: '800', marginTop: 24 },
+  subtitle: { color: '#64748B', fontSize: 16, marginTop: 8, marginBottom: 32 },
+  label: { color: '#172033', fontSize: 14, fontWeight: '700', marginBottom: 8 },
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -224,6 +209,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 15,
     fontSize: 16,
+    color: '#172033',
     marginBottom: 20,
   },
   button: {
@@ -235,10 +221,23 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.65 },
   buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
-  note: {
-    color: '#64748B',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 24,
+  note: { color: '#64748B', fontSize: 13, textAlign: 'center', marginTop: 24 },
+  registerPanel: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9E1EF',
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 26,
   },
+  registerHeading: { color: '#172033', fontSize: 18, fontWeight: '800' },
+  registerDescription: { color: '#64748B', fontSize: 14, marginTop: 6, marginBottom: 14 },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: '#2463EB',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  secondaryButtonText: { color: '#2463EB', fontSize: 16, fontWeight: '700' },
 });

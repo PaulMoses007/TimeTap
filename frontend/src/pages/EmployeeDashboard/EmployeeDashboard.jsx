@@ -674,8 +674,29 @@ const formatTime = (value) => {
     }
 
     // After checkout, show the saved attendance value.
-    if (attendance.check_out) {
-      return `${attendance.worked_hours ?? 0} hrs`;
+        if (attendance.check_out) {
+const minutes = Number(
+  attendance.worked_minutes ??
+    Math.round(Number(attendance.worked_hours ?? 0) * 60)
+);
+
+if (!Number.isFinite(minutes) || minutes < 0) {
+  return "0 minutes";
+}
+
+if (minutes < 60) {
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+const hours = Math.floor(minutes / 60);
+const remainingMinutes = minutes % 60;
+
+if (remainingMinutes === 0) {
+  return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+}
+
+return `${hours} ${hours === 1 ? "hour" : "hours"} ${remainingMinutes} min`;
+
     }
 
 const checkInTime = parseBackendUtc(

@@ -49,3 +49,11 @@ export const updateEmployee = async (
 
   return response.data;
 };
+
+export const getEmployeeAttendance = async (employeeId) => {
+  const response = await api.get(
+    `/attendance/employee/${employeeId}`
+  );
+
+  return response.data;
+};

@@ -69,6 +69,23 @@ export default function ManagerDashboard() {
           Manage your restaurant team and attendance.
         </Text>
 
+        {/* Restaurants */}
+        <Pressable
+          style={styles.restaurantCard}
+          onPress={() => router.push('/restaurants')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.restaurantTitle}>Restaurants</Text>
+          <Text style={styles.restaurantDescription}>
+            View restaurant details, invitation codes, and restaurant
+            actions.
+          </Text>
+          <Text style={styles.restaurantLink}>
+            Manage restaurants {'→'}
+          </Text>
+        </Pressable>
+
+        {/* Employee Attendance */}
         <Pressable
           style={styles.card}
           onPress={() => router.push('/attendance')}
@@ -78,9 +95,10 @@ export default function ManagerDashboard() {
           <Text style={styles.cardDescription}>
             View employee attendance and check-in activity.
           </Text>
-          <Text style={styles.link}>View attendance →</Text>
+          <Text style={styles.link}>View attendance {'→'}</Text>
         </Pressable>
 
+        {/* Team */}
         <Pressable
           style={styles.card}
           onPress={() => router.push('/team')}
@@ -90,17 +108,10 @@ export default function ManagerDashboard() {
           <Text style={styles.cardDescription}>
             Manage employees and review their attendance.
           </Text>
-          <Text style={styles.link}>View employees →</Text>
+          <Text style={styles.link}>View employees {'→'}</Text>
         </Pressable>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Reports</Text>
-          <Text style={styles.cardDescription}>
-            Review attendance records and working hours.
-          </Text>
-          <Text style={styles.link}>Coming next</Text>
-        </View>
-
+        {/* Logout */}
         <Pressable
           style={styles.logoutButton}
           onPress={logout}
@@ -148,7 +159,33 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 16,
     marginTop: 8,
-    marginBottom: 32,
+    marginBottom: 28,
+    lineHeight: 23,
+  },
+  restaurantCard: {
+    backgroundColor: '#E8F0FF',
+    padding: 20,
+    borderRadius: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#B8CEFA',
+  },
+  restaurantTitle: {
+    color: '#173D75',
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  restaurantDescription: {
+    color: '#425574',
+    fontSize: 15,
+    marginTop: 12,
+    lineHeight: 22,
+  },
+  restaurantLink: {
+    color: '#2463EB',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 18,
   },
   card: {
     backgroundColor: '#FFFFFF',

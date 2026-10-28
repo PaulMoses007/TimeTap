@@ -575,3 +575,49 @@ def attendance_history(
     """
 
     return get_all_attendance(db)
+
+
+# ============================================================
+# MANAGER - INDIVIDUAL EMPLOYEE ATTENDANCE HISTORY
+# ============================================================
+
+@router.get(
+    "/employee/{employee_id}",
+    response_model=list[AttendanceResponse]
+)
+def employee_attendance_history(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    """
+    Return attendance history for one employee
+    belonging to the logged-in manager's restaurant.
+    """
+
+    employee = (
+        db.query(Employee)
+        .join(
+            Restaurant,
+            Employee.restaurant_id == Restaurant.id
+        )
+        .filter(
+            Employee.id == employee_id,
+            Employee.role != "Manager",
+            Restaurant.manager_id == current_user["id"]
+        )
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found in your restaurant."
+        )
+
+    return (
+        db.query(Attendance)
+        .filter(Attendance.employee_id == employee.id)
+        .order_by(Attendance.work_date.desc())
+        .all()
+    )

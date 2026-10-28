@@ -203,9 +203,29 @@ function EmployeeAttendance() {
       return "-";
     }
 
-    if (record.check_out) {
-      return `${record.worked_hours ?? 0} hrs`;
-    }
+if (record.check_out) {
+  const minutes =
+    record.worked_minutes != null
+      ? Number(record.worked_minutes)
+      : Math.round(Number(record.worked_hours ?? 0) * 60);
+
+  if (!Number.isFinite(minutes) || minutes < 0) {
+    return "0 minutes";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  }
+
+  return `${hours} ${hours === 1 ? "hour" : "hours"} ${remainingMinutes} min`;
+}
 
     const checkIn =
       parseBackendUtc(record.check_in);

@@ -14,7 +14,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://tiny-badgers-ring.loca.lt';
+const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
 
 type Profile = {
   id: number;
@@ -84,6 +84,12 @@ export default function EmployeeDashboard() {
 
     const data = await readResponse(response);
 
+    if (response.status === 401 || response.status === 403) {
+      await SecureStore.deleteItemAsync('timetap_access_token');
+      router.replace('/login');
+      throw new Error('Your session expired or access was denied. Please log in again.');
+    }
+
     if (!response.ok) {
       throw new Error(
         typeof data.detail === 'string'
@@ -102,8 +108,8 @@ export default function EmployeeDashboard() {
         apiRequest('/attendance/my'),
       ]);
 
-      setProfile(user);
-      setHistory(records);
+      setProfile(user as Profile);
+      setHistory(Array.isArray(records) ? records : []);
     } catch (error) {
       console.error('Employee dashboard error:', error);
       Alert.alert(
@@ -119,12 +125,12 @@ export default function EmployeeDashboard() {
   }, []);
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
   }, [loadDashboard]);
 
   useFocusEffect(
     useCallback(() => {
-      loadDashboard();
+      void loadDashboard();
     }, [loadDashboard]),
   );
 
@@ -165,14 +171,19 @@ export default function EmployeeDashboard() {
   }
 
   async function logout() {
-    await SecureStore.deleteItemAsync('timetap_access_token');
-    router.replace('/login');
+    try {
+      await SecureStore.deleteItemAsync('timetap_access_token');
+      router.replace('/login');
+    } catch {
+      Alert.alert('Error', 'Could not log out. Please try again.');
+    }
   }
 
-  const isCheckedIn =
-    history.length > 0 &&
-    history[0].work_date === new Date().toLocaleDateString('en-CA') &&
-    history[0].check_out === null;
+  // An open shift can continue past midnight.
+  // Do not rely only on today's date to enable checkout.
+  const isCheckedIn = history.some(
+    (record) => record.check_out == null,
+  );
 
   if (loading) {
     return (
@@ -192,7 +203,7 @@ export default function EmployeeDashboard() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              loadDashboard();
+              void loadDashboard();
             }}
           />
         }
@@ -203,26 +214,55 @@ export default function EmployeeDashboard() {
           Your attendance and work information.
         </Text>
 
+        {/* Employee profile */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>
             {profile
               ? `${profile.first_name} ${profile.last_name}`
               : 'Employee'}
           </Text>
-          <Text style={styles.info}>ID: {profile?.employee_id ?? '—'}</Text>
-          <Text style={styles.info}>Role: {profile?.role ?? '—'}</Text>
+          <Text style={styles.info}>
+            ID: {profile?.employee_id ?? '—'}
+          </Text>
+          <Text style={styles.info}>
+            Role: {profile?.role ?? '—'}
+          </Text>
           <Text style={styles.info}>
             Restaurant: {profile?.restaurant_name ?? 'Not assigned'}
           </Text>
-          <Text style={styles.info}>Email: {profile?.email ?? '—'}</Text>
+          <Text style={styles.info}>
+            Email: {profile?.email ?? '—'}
+          </Text>
         </View>
 
+        {/* Today's attendance */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today's Attendance</Text>
           <Text style={styles.subtitle}>
-            Record your arrival and departure for your shift.
+            Scan your restaurant QR code or use the attendance buttons.
           </Text>
 
+          {/* QR scanner */}
+          <Pressable
+            style={[
+              styles.scanButton,
+              actionLoading !== null && styles.disabledButton,
+            ]}
+            disabled={actionLoading !== null}
+            onPress={() => router.push('/scan-qr')}
+          >
+            <Text style={styles.primaryButtonText}>
+              Scan QR Code
+            </Text>
+          </Pressable>
+
+          <Text style={styles.info}>
+            {isCheckedIn
+              ? 'Your shift is in progress.'
+              : 'You are not currently checked in.'}
+          </Text>
+
+          {/* Manual check-in */}
           <Pressable
             style={[
               styles.primaryButton,
@@ -236,11 +276,12 @@ export default function EmployeeDashboard() {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.primaryButtonText}>
-                {isCheckedIn ? 'Checked In' : 'Check In'}
+                {isCheckedIn ? 'Already Checked In' : 'Check In'}
               </Text>
             )}
           </Pressable>
 
+          {/* Manual check-out */}
           <Pressable
             style={[
               styles.secondaryButton,
@@ -258,6 +299,7 @@ export default function EmployeeDashboard() {
           </Pressable>
         </View>
 
+        {/* Attendance history */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Attendance History</Text>
 
@@ -268,7 +310,9 @@ export default function EmployeeDashboard() {
           ) : (
             history.map((record) => (
               <View key={record.id} style={styles.historyItem}>
-                <Text style={styles.historyDate}>{record.work_date}</Text>
+                <Text style={styles.historyDate}>
+                  {record.work_date}
+                </Text>
                 <Text style={styles.info}>
                   Check-in: {formatTime(record.check_in)}
                 </Text>
@@ -276,14 +320,19 @@ export default function EmployeeDashboard() {
                   Check-out: {formatTime(record.check_out)}
                 </Text>
                 <Text style={styles.info}>
-                  Hours worked: {record.worked_hours ?? 0}
+                  Hours worked:{' '}
+                  {record.worked_minutes ??
+                    Math.round((record.worked_hours ?? 0) * 60)} minutes
                 </Text>
-                <Text style={styles.info}>Status: {record.status}</Text>
+                <Text style={styles.info}>
+                  Status: {record.status}
+                </Text>
               </View>
             ))
           )}
         </View>
 
+        {/* Logout */}
         <Pressable style={styles.logoutButton} onPress={logout}>
           <Text style={styles.primaryButtonText}>Log out</Text>
         </Pressable>
@@ -362,6 +411,14 @@ const styles = StyleSheet.create({
   muted: {
     color: '#64748B',
     marginTop: 12,
+  },
+  scanButton: {
+    backgroundColor: '#173D75',
+    padding: 17,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 8,
   },
   primaryButton: {
     backgroundColor: '#2463EB',

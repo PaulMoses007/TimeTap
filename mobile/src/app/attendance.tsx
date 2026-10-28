@@ -14,7 +14,7 @@ import {
 import { useFocusEffect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://tiny-badgers-ring.loca.lt';
+const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
 
 type AttendanceRecord = {
   employee_id: string;
