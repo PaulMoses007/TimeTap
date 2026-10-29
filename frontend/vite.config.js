@@ -10,8 +10,9 @@ export default defineConfig({
 
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: 'https://timetap-backend.onrender.com',
         changeOrigin: true,
+        secure: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },

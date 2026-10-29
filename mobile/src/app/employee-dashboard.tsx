@@ -1,20 +1,20 @@
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 type Profile = {
   id: number;
@@ -38,14 +38,14 @@ type AttendanceRecord = {
   status: string;
 };
 
-async function readResponse(response: Response) {
+async function readResponse(response: Response): Promise<any> {
   const text = await response.text();
 
   try {
     return JSON.parse(text);
   } catch {
     throw new Error(
-      `Unexpected server response (HTTP ${response.status}). Check that your backend and LocalTunnel are running.`,
+      `Unexpected server response (HTTP ${response.status}). Please try again.`,
     );
   }
 }
@@ -77,7 +77,6 @@ export default function EmployeeDashboard() {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
-        'Bypass-Tunnel-Reminder': 'true',
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
@@ -87,7 +86,11 @@ export default function EmployeeDashboard() {
     if (response.status === 401 || response.status === 403) {
       await SecureStore.deleteItemAsync('timetap_access_token');
       router.replace('/login');
-      throw new Error('Your session expired or access was denied. Please log in again.');
+      throw new Error(
+        typeof data.detail === 'string'
+          ? data.detail
+          : 'Your session expired or access was denied. Please log in again.',
+      );
     }
 
     if (!response.ok) {
@@ -111,7 +114,8 @@ export default function EmployeeDashboard() {
       setProfile(user as Profile);
       setHistory(Array.isArray(records) ? records : []);
     } catch (error) {
-      console.error('Employee dashboard error:', error);
+      console.error('TimeTap employee dashboard error:', error);
+
       Alert.alert(
         'Unable to load attendance',
         error instanceof Error
@@ -123,10 +127,6 @@ export default function EmployeeDashboard() {
       setRefreshing(false);
     }
   }, []);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
 
   useFocusEffect(
     useCallback(() => {
@@ -171,19 +171,11 @@ export default function EmployeeDashboard() {
   }
 
   async function logout() {
-    try {
-      await SecureStore.deleteItemAsync('timetap_access_token');
-      router.replace('/login');
-    } catch {
-      Alert.alert('Error', 'Could not log out. Please try again.');
-    }
+    await SecureStore.deleteItemAsync('timetap_access_token');
+    router.replace('/login');
   }
 
-  // An open shift can continue past midnight.
-  // Do not rely only on today's date to enable checkout.
-  const isCheckedIn = history.some(
-    (record) => record.check_out == null,
-  );
+  const isCheckedIn = history.some((record) => record.check_out == null);
 
   if (loading) {
     return (
@@ -214,35 +206,26 @@ export default function EmployeeDashboard() {
           Your attendance and work information.
         </Text>
 
-        {/* Employee profile */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>
             {profile
               ? `${profile.first_name} ${profile.last_name}`
               : 'Employee'}
           </Text>
-          <Text style={styles.info}>
-            ID: {profile?.employee_id ?? '—'}
-          </Text>
-          <Text style={styles.info}>
-            Role: {profile?.role ?? '—'}
-          </Text>
+          <Text style={styles.info}>ID: {profile?.employee_id ?? '—'}</Text>
+          <Text style={styles.info}>Role: {profile?.role ?? '—'}</Text>
           <Text style={styles.info}>
             Restaurant: {profile?.restaurant_name ?? 'Not assigned'}
           </Text>
-          <Text style={styles.info}>
-            Email: {profile?.email ?? '—'}
-          </Text>
+          <Text style={styles.info}>Email: {profile?.email ?? '—'}</Text>
         </View>
 
-        {/* Today's attendance */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today's Attendance</Text>
           <Text style={styles.subtitle}>
             Scan your restaurant QR code or use the attendance buttons.
           </Text>
 
-          {/* QR scanner */}
           <Pressable
             style={[
               styles.scanButton,
@@ -251,9 +234,7 @@ export default function EmployeeDashboard() {
             disabled={actionLoading !== null}
             onPress={() => router.push('/scan-qr')}
           >
-            <Text style={styles.primaryButtonText}>
-              Scan QR Code
-            </Text>
+            <Text style={styles.primaryButtonText}>Scan QR Code</Text>
           </Pressable>
 
           <Text style={styles.info}>
@@ -262,7 +243,6 @@ export default function EmployeeDashboard() {
               : 'You are not currently checked in.'}
           </Text>
 
-          {/* Manual check-in */}
           <Pressable
             style={[
               styles.primaryButton,
@@ -281,7 +261,6 @@ export default function EmployeeDashboard() {
             )}
           </Pressable>
 
-          {/* Manual check-out */}
           <Pressable
             style={[
               styles.secondaryButton,
@@ -299,7 +278,6 @@ export default function EmployeeDashboard() {
           </Pressable>
         </View>
 
-        {/* Attendance history */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Attendance History</Text>
 
@@ -310,9 +288,7 @@ export default function EmployeeDashboard() {
           ) : (
             history.map((record) => (
               <View key={record.id} style={styles.historyItem}>
-                <Text style={styles.historyDate}>
-                  {record.work_date}
-                </Text>
+                <Text style={styles.historyDate}>{record.work_date}</Text>
                 <Text style={styles.info}>
                   Check-in: {formatTime(record.check_in)}
                 </Text>
@@ -324,15 +300,12 @@ export default function EmployeeDashboard() {
                   {record.worked_minutes ??
                     Math.round((record.worked_hours ?? 0) * 60)} minutes
                 </Text>
-                <Text style={styles.info}>
-                  Status: {record.status}
-                </Text>
+                <Text style={styles.info}>Status: {record.status}</Text>
               </View>
             ))
           )}
         </View>
 
-        {/* Logout */}
         <Pressable style={styles.logoutButton} onPress={logout}>
           <Text style={styles.primaryButtonText}>Log out</Text>
         </Pressable>
@@ -355,10 +328,7 @@ function formatTime(value: string | null) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F7F8FC',
-  },
+  safeArea: { flex: 1, backgroundColor: '#F7F8FC' },
   center: {
     flex: 1,
     justifyContent: 'center',
@@ -370,11 +340,7 @@ const styles = StyleSheet.create({
     paddingTop: 36,
     paddingBottom: 48,
   },
-  brand: {
-    color: '#173D75',
-    fontSize: 32,
-    fontWeight: '800',
-  },
+  brand: { color: '#173D75', fontSize: 32, fontWeight: '800' },
   heading: {
     color: '#172033',
     fontSize: 27,
@@ -408,10 +374,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     lineHeight: 23,
   },
-  muted: {
-    color: '#64748B',
-    marginTop: 12,
-  },
+  muted: { color: '#64748B', marginTop: 12 },
   scanButton: {
     backgroundColor: '#173D75',
     padding: 17,
@@ -434,9 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 14,
   },
-  disabledButton: {
-    opacity: 0.55,
-  },
+  disabledButton: { opacity: 0.55 },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
