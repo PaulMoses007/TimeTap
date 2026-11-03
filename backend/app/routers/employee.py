@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
-from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeResponse
+from app.schemas.employee import (
+    EmployeeCreate,
+    EmployeeUpdate,
+    EmployeeResponse,
+    ManagerProfileUpdate,
+)
 from app.security.password import hash_password, verify_password
 from app.security.dependencies import get_current_user
 from app.security.roles import require_manager
@@ -300,6 +305,50 @@ def get_current_employee(
             status_code=404,
             detail="Current employee not found"
         )
+
+    return employee_response(employee, db)
+
+@router.put("/me/profile", response_model=EmployeeResponse)
+def update_my_profile(
+    profile_data: ManagerProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_manager)
+):
+    employee = (
+        db.query(Employee)
+        .filter(Employee.id == current_user["id"])
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Current employee not found"
+        )
+
+    # Check whether another account already uses this email
+    existing_email = (
+        db.query(Employee)
+        .filter(
+            Employee.email == profile_data.email,
+            Employee.id != employee.id
+        )
+        .first()
+    )
+
+    if existing_email:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered."
+        )
+
+    employee.first_name = profile_data.first_name
+    employee.last_name = profile_data.last_name
+    employee.email = profile_data.email
+    employee.phone = profile_data.phone
+
+    db.commit()
+    db.refresh(employee)
 
     return employee_response(employee, db)
 

@@ -103,3 +103,14 @@ class EmployeeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================================================
+# UPDATE MY OWN PROFILE
+# ==================================================
+
+class ManagerProfileUpdate(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    phone: str
