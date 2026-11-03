@@ -14,7 +14,7 @@ import {
 import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
-const API_BASE_URL = "https://dry-clouds-thank.loca.lt";
+const API_BASE_URL = "https://timetap-backend.onrender.com";
 
 type Employee = {
   id: number;
@@ -143,7 +143,7 @@ export default function TeamScreen() {
   };
 
   const formatDateTime = (value?: string | null) => {
-    if (!value) return "—";
+    if (!value) return "â€”";
 
     const date = new Date(value);
 
@@ -213,11 +213,11 @@ export default function TeamScreen() {
           const duration = formatDuration(record);
 
           return (
-            `${index + 1}. Date: ${record.work_date ?? "—"}\n` +
+            `${index + 1}. Date: ${record.work_date ?? "â€”"}\n` +
             `Check-in: ${formatDateTime(record.check_in)}\n` +
             `Check-out: ${formatDateTime(record.check_out)}\n` +
             `Duration: ${duration}\n` +
-            `Status: ${record.status ?? "—"}`
+            `Status: ${record.status ?? "â€”"}`
           );
         })
         .join("\n\n");
@@ -240,10 +240,10 @@ export default function TeamScreen() {
   const showEmployeeDetails = (employee: Employee) => {
     const details =
       `Employee ID: ${employee.employee_id ?? employee.id}\n` +
-      `Email: ${employee.email ?? "—"}\n` +
-      `Phone: ${employee.phone ?? "—"}\n` +
+      `Email: ${employee.email ?? "â€”"}\n` +
+      `Phone: ${employee.phone ?? "â€”"}\n` +
       `Role: ${employee.role ?? "Employee"}\n` +
-      `Restaurant: ${employee.restaurant_name ?? "—"}\n` +
+      `Restaurant: ${employee.restaurant_name ?? "â€”"}\n` +
       `Account: ${employee.is_active === false ? "Inactive" : "Active"}\n` +
       `Approval: ${employee.approval_status ?? "Unknown"}`;
 

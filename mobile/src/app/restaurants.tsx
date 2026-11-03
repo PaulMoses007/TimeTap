@@ -15,7 +15,7 @@ import { useFocusEffect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as Clipboard from 'expo-clipboard';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 type Restaurant = {
   id: number;
@@ -201,7 +201,7 @@ export default function RestaurantsScreen() {
             <View key={restaurant.id} style={styles.card}>
               <View style={styles.restaurantHeader}>
                 <View style={styles.iconCircle}>
-                  <Text style={styles.iconText}>🍴</Text>
+                  <Text style={styles.iconText}>ðŸ´</Text>
                 </View>
 
                 <View style={styles.restaurantHeading}>
@@ -252,7 +252,7 @@ export default function RestaurantsScreen() {
                         copyInvitationCode(restaurant.invitation_code!)
                       }
                     >
-                      <Text style={styles.copyText}>▢ COPY</Text>
+                      <Text style={styles.copyText}>â–¢ COPY</Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -273,7 +273,7 @@ export default function RestaurantsScreen() {
                   }
                 >
                   <Text style={styles.qrButtonText}>
-                    ▦ ATTENDANCE QR
+                    â–¦ ATTENDANCE QR
                   </Text>
                 </Pressable>
 

@@ -32,6 +32,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
+      // STEP 1: Send login request
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -45,6 +46,7 @@ export default function LoginScreen() {
       });
 
       const responseText = await response.text();
+
       let data: any;
 
       try {
@@ -52,7 +54,7 @@ export default function LoginScreen() {
       } catch {
         Alert.alert(
           'Server response error',
-          `The server returned an unexpected response (HTTP ${response.status}).`,
+          `HTTP ${response.status}\n\nServer message:\n${responseText.slice(0, 300) || 'Empty response'}`,
         );
         return;
       }
@@ -72,51 +74,63 @@ export default function LoginScreen() {
         return;
       }
 
+      // STEP 2: Save access token
       await SecureStore.setItemAsync(
         'timetap_access_token',
         data.access_token,
       );
 
-      const profileResponse = await fetch(`${API_BASE_URL}/employees/me`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${data.access_token}`,
+      // STEP 3: Load employee profile
+      const profileResponse = await fetch(
+        `${API_BASE_URL}/employees/me`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${data.access_token}`,
+          },
         },
-      });
+      );
 
       const profileText = await profileResponse.text();
+
       let profile: any;
 
       try {
         profile = JSON.parse(profileText);
       } catch {
         await SecureStore.deleteItemAsync('timetap_access_token');
+
         Alert.alert(
-          'Profile error',
-          `The server returned an invalid profile response (HTTP ${profileResponse.status}).`,
+          'Profile response error',
+          `HTTP ${profileResponse.status}\n\nServer message:\n${profileText.slice(0, 300) || 'Empty response'}`,
         );
         return;
       }
 
       if (!profileResponse.ok) {
         await SecureStore.deleteItemAsync('timetap_access_token');
+
         Alert.alert(
           'Profile error',
           typeof profile.detail === 'string'
             ? profile.detail
-            : `Could not load your account details (HTTP ${profileResponse.status}).`,
+            : `Could not load account details (HTTP ${profileResponse.status}).`,
         );
         return;
       }
 
-      const role = String(profile.role ?? '').trim().toLowerCase();
+      // STEP 4: Navigate according to employee role
+      const role = String(profile.role ?? '')
+        .trim()
+        .toLowerCase();
 
       if (role === 'manager') {
         router.replace('/manager-dashboard');
       } else {
         router.replace('/employee-dashboard');
       }
+
     } catch (error) {
       console.error('TimeTap login error:', error);
 
@@ -124,6 +138,7 @@ export default function LoginScreen() {
         'Connection error',
         'Cannot reach TimeTap. Check your internet connection and try again.',
       );
+
     } finally {
       setLoading(false);
     }
@@ -139,17 +154,23 @@ export default function LoginScreen() {
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
         >
-          <Pressable onPress={() => router.back()} accessibilityRole="button">
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+          >
             <Text style={styles.back}>‹ Back</Text>
           </Pressable>
 
           <Text style={styles.brand}>TimeTap</Text>
+
           <Text style={styles.heading}>Welcome back</Text>
+
           <Text style={styles.subtitle}>
             Log in to your restaurant account.
           </Text>
 
           <Text style={styles.label}>Email address</Text>
+
           <TextInput
             style={styles.input}
             value={email}
@@ -164,6 +185,7 @@ export default function LoginScreen() {
           />
 
           <Text style={styles.label}>Password</Text>
+
           <TextInput
             style={styles.input}
             value={password}
@@ -193,7 +215,10 @@ export default function LoginScreen() {
           </Text>
 
           <View style={styles.registerPanel}>
-            <Text style={styles.registerHeading}>New to TimeTap?</Text>
+            <Text style={styles.registerHeading}>
+              New to TimeTap?
+            </Text>
+
             <Text style={styles.registerDescription}>
               Create an account to get started.
             </Text>
@@ -215,11 +240,28 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F7F8FC' },
-  keyboard: { flex: 1 },
-  container: { flexGrow: 1, padding: 24, justifyContent: 'center' },
-  back: { color: '#2463EB', fontSize: 17, marginBottom: 32 },
-  brand: { color: '#173D75', fontSize: 32, fontWeight: '800' },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7F8FC',
+  },
+  keyboard: {
+    flex: 1,
+  },
+  container: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'center',
+  },
+  back: {
+    color: '#2463EB',
+    fontSize: 17,
+    marginBottom: 32,
+  },
+  brand: {
+    color: '#173D75',
+    fontSize: 32,
+    fontWeight: '800',
+  },
   heading: {
     color: '#172033',
     fontSize: 28,
@@ -255,8 +297,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  buttonDisabled: { opacity: 0.65 },
-  buttonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  buttonDisabled: {
+    opacity: 0.65,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
   note: {
     color: '#64748B',
     fontSize: 13,

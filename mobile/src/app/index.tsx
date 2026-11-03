@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 export default function HomeScreen() {
   const [email, setEmail] = useState('');
@@ -60,7 +60,7 @@ export default function HomeScreen() {
       } catch {
         Alert.alert(
           'Server error',
-          'The server returned an unexpected response.',
+          `HTTP ${response.status}\n\nServer message:\n${responseText.slice(0, 300) || 'Empty response'}`,
         );
         return;
       }

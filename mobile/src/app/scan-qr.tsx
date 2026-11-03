@@ -1,4 +1,4 @@
-
+﻿
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 type EmployeeProfile = {
   id?: number;

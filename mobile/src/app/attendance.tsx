@@ -14,7 +14,7 @@ import {
 import { useFocusEffect, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 type AttendanceRecord = {
   employee_id: string;
@@ -125,7 +125,7 @@ export default function AttendanceScreen() {
   const absent = records.filter((r) => r.status === 'Absent').length;
 
   function formatTime(value?: string | null) {
-    if (!value) return '—';
+    if (!value) return 'â€”';
 
     const date = new Date(value);
 
@@ -149,7 +149,7 @@ export default function AttendanceScreen() {
         }
       >
         <Pressable onPress={() => router.replace('/manager-dashboard')}>
-          <Text style={styles.back}>‹ Back to dashboard</Text>
+          <Text style={styles.back}>â€¹ Back to dashboard</Text>
         </Pressable>
 
         <Text style={styles.brand}>TimeTap</Text>

@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-const API_BASE_URL = 'https://dry-clouds-thank.loca.lt';
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 const ROLES = ['Server', 'Chef', 'DishWasher', 'Bartender', 'Cashier', 'Other'];
 
 export default function RegisterEmployeeScreen() {
@@ -100,7 +100,7 @@ export default function RegisterEmployeeScreen() {
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Pressable onPress={() => router.back()}>
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={styles.back}>â€¹ Back</Text>
           </Pressable>
           <Text style={styles.brand}>TimeTap</Text>
           <Text style={styles.heading}>Employee registration</Text>
