@@ -1,3 +1,4 @@
+
 import os
 import secrets
 import string
@@ -451,12 +452,21 @@ def get_restaurant_qr(
         f"qrcodes/restaurant_{restaurant_id}.png"
     )
 
+    # Regenerate QR image if missing
     if not os.path.exists(filepath):
 
-        raise HTTPException(
-            status_code=404,
-            detail="QR code not found"
-        )
+        try:
+            filepath = generate_restaurant_qr(
+                restaurant.id,
+                restaurant.name
+            )
+
+        except Exception as error:
+
+            raise HTTPException(
+                status_code=500,
+                detail="Could not generate restaurant QR code"
+            ) from error
 
     return FileResponse(
         path=filepath,

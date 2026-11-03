@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -11,8 +13,12 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import { useFocusEffect, router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+
 import { getToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
@@ -32,6 +38,12 @@ export default function RestaurantsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // QR code states
+  const [qrUri, setQrUri] = useState<string | null>(null);
+  const [qrRestaurant, setQrRestaurant] = useState<Restaurant | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrSharing, setQrSharing] = useState(false);
 
   const loadRestaurants = useCallback(async (refresh = false) => {
     if (refresh) {
@@ -149,6 +161,89 @@ export default function RestaurantsScreen() {
     }
   }
 
+  // Download the restaurant QR image from the backend
+  async function openRestaurantQr(restaurant: Restaurant) {
+    setQrLoading(true);
+
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
+
+      if (!FileSystem.cacheDirectory) {
+        throw new Error('Device storage is unavailable.');
+      }
+
+      const fileUri =
+        `${FileSystem.cacheDirectory}restaurant_${restaurant.id}_${Date.now()}.png`;
+
+      const result = await FileSystem.downloadAsync(
+        `${API_BASE_URL}/restaurants/${restaurant.id}/qr`,
+        fileUri,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'image/png',
+          },
+        },
+      );
+
+      if (result.status !== 200) {
+        throw new Error(
+          result.status === 404
+            ? 'QR image was not found. The backend QR generator needs to be checked.'
+            : `Could not download QR image. Server returned ${result.status}.`,
+        );
+      }
+
+      setQrUri(result.uri);
+      setQrRestaurant(restaurant);
+    } catch (error: any) {
+      Alert.alert(
+        'QR download failed',
+        error.message || 'Please try again.',
+      );
+    } finally {
+      setQrLoading(false);
+    }
+  }
+
+  // Open Android sharing menu to save or share the QR image
+  async function shareRestaurantQr() {
+    if (!qrUri) return;
+
+    setQrSharing(true);
+
+    try {
+      const available = await Sharing.isAvailableAsync();
+
+      if (!available) {
+        throw new Error('Sharing is not available on this device.');
+      }
+
+      await Sharing.shareAsync(qrUri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Save or share restaurant QR code',
+        UTI: 'public.png',
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Sharing failed',
+        error.message || 'Could not share the QR image.',
+      );
+    } finally {
+      setQrSharing(false);
+    }
+  }
+
+  function closeQrModal() {
+    setQrUri(null);
+    setQrRestaurant(null);
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -170,6 +265,7 @@ export default function RestaurantsScreen() {
         }
       >
         <Text style={styles.heading}>Restaurants</Text>
+
         <Text style={styles.subtitle}>
           Manage restaurants registered in TimeTap.
         </Text>
@@ -178,7 +274,9 @@ export default function RestaurantsScreen() {
           style={styles.addButton}
           onPress={() => router.push('/register-restaurant')}
         >
-          <Text style={styles.addButtonText}>+ Register Restaurant</Text>
+          <Text style={styles.addButtonText}>
+            + Register Restaurant
+          </Text>
         </Pressable>
 
         {restaurants.length === 0 ? (
@@ -186,6 +284,7 @@ export default function RestaurantsScreen() {
             <Text style={styles.emptyTitle}>
               No restaurants registered yet
             </Text>
+
             <Text style={styles.muted}>
               Register your restaurant to get an employee invitation code.
             </Text>
@@ -202,6 +301,7 @@ export default function RestaurantsScreen() {
                   <Text style={styles.restaurantName}>
                     {restaurant.name}
                   </Text>
+
                   <Text style={styles.restaurantNumber}>
                     Restaurant #{restaurant.id}
                   </Text>
@@ -214,10 +314,12 @@ export default function RestaurantsScreen() {
                 <Text style={styles.detailLabel}>Address: </Text>
                 {restaurant.address || 'Not provided'}
               </Text>
+
               <Text style={styles.detail}>
                 <Text style={styles.detailLabel}>Phone: </Text>
                 {restaurant.phone || 'Not provided'}
               </Text>
+
               <Text style={styles.detail}>
                 <Text style={styles.detailLabel}>Email: </Text>
                 {restaurant.email || 'Not provided'}
@@ -227,6 +329,7 @@ export default function RestaurantsScreen() {
                 <Text style={styles.invitationTitle}>
                   Employee Invitation
                 </Text>
+
                 <Text style={styles.invitationDescription}>
                   Give this code to employees so they can register for
                   this restaurant.
@@ -246,7 +349,9 @@ export default function RestaurantsScreen() {
                         copyInvitationCode(restaurant.invitation_code!)
                       }
                     >
-                      <Text style={styles.copyText}>▣ COPY</Text>
+                      <Text style={styles.copyText}>
+                        COPY
+                      </Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -259,16 +364,16 @@ export default function RestaurantsScreen() {
               <View style={styles.actions}>
                 <Pressable
                   style={styles.qrButton}
-                  onPress={() =>
-                    Alert.alert(
-                      'Attendance QR',
-                      'We need to connect this button to your backend QR response before displaying the code.',
-                    )
-                  }
+                  disabled={qrLoading}
+                  onPress={() => openRestaurantQr(restaurant)}
                 >
-                  <Text style={styles.qrButtonText}>
-                    ▦ ATTENDANCE QR
-                  </Text>
+                  {qrLoading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.qrButtonText}>
+                      ATTENDANCE QR
+                    </Text>
+                  )}
                 </Pressable>
 
                 <Pressable
@@ -294,9 +399,62 @@ export default function RestaurantsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backText}>Back to Dashboard</Text>
+          <Text style={styles.backText}>
+            Back to Dashboard
+          </Text>
         </Pressable>
       </ScrollView>
+
+      {/* QR Code Preview Popup */}
+      <Modal
+        visible={!!qrUri}
+        transparent
+        animationType="fade"
+        onRequestClose={closeQrModal}
+      >
+        <View style={styles.qrModalBackground}>
+          <View style={styles.qrModalCard}>
+            <Text style={styles.qrModalTitle}>
+              Attendance QR Code
+            </Text>
+
+            <Text style={styles.qrModalSubtitle}>
+              {qrRestaurant?.name}
+            </Text>
+
+            {qrUri && (
+              <Image
+                source={{ uri: qrUri }}
+                style={styles.qrImage}
+                resizeMode="contain"
+              />
+            )}
+
+            <Pressable
+              style={styles.qrShareButton}
+              disabled={qrSharing}
+              onPress={shareRestaurantQr}
+            >
+              {qrSharing ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.qrShareText}>
+                  Save / Share QR Code
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={styles.qrCloseButton}
+              onPress={closeQrModal}
+            >
+              <Text style={styles.qrCloseText}>
+                Close
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -500,6 +658,57 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   backText: {
+    color: '#2463EB',
+    fontWeight: '600',
+  },
+
+  // QR popup styles
+  qrModalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  qrModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 22,
+    alignItems: 'center',
+  },
+  qrModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#172033',
+  },
+  qrModalSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 6,
+  },
+  qrImage: {
+    width: 250,
+    height: 250,
+    marginVertical: 18,
+  },
+  qrShareButton: {
+    width: '100%',
+    backgroundColor: '#1976D2',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  qrShareText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  qrCloseButton: {
+    padding: 12,
+    marginTop: 5,
+  },
+  qrCloseText: {
     color: '#2463EB',
     fontWeight: '600',
   },
