@@ -134,37 +134,21 @@ function RestaurantManagement() {
 
     try {
 
-      const response = await fetch(
-        "/api/restaurants/",
+      // Use the shared Axios client so this request goes to
+      // the Render backend, just like the QR-code request.
+      const response = await api.post(
+        "/restaurants/",
+        formData,
         {
-          method: "POST",
-
           headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              `Bearer ${localStorage.getItem(
-                "access_token"
-              )}`,
+            Authorization: `Bearer ${localStorage.getItem(
+              "access_token"
+            )}`,
           },
-
-          body: JSON.stringify(
-            formData
-          ),
         }
       );
 
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-
-        throw new Error(
-          data.detail ||
-          "Failed to create restaurant."
-        );
-      }
+      const data = response.data;
 
       setFormData({
         name: "",
