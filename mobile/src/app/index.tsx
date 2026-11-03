@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { setToken, deleteToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -44,7 +44,6 @@ export default function HomeScreen() {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          'Bypass-Tunnel-Reminder': 'true',
         },
         body: JSON.stringify({
           email: email.trim(),
@@ -80,18 +79,16 @@ export default function HomeScreen() {
         return;
       }
 
-      await SecureStore.setItemAsync(
-        'timetap_access_token',
-        data.access_token,
-      );
+      // Save access token
+      await setToken(data.access_token);
 
+      // Load employee profile
       const profileResponse = await fetch(
         `${API_BASE_URL}/employees/me`,
         {
           headers: {
             Accept: 'application/json',
             Authorization: `Bearer ${data.access_token}`,
-            'Bypass-Tunnel-Reminder': 'true',
           },
         },
       );
@@ -102,7 +99,8 @@ export default function HomeScreen() {
       try {
         profile = JSON.parse(profileText);
       } catch {
-        await SecureStore.deleteItemAsync('timetap_access_token');
+        await deleteToken();
+
         Alert.alert(
           'Profile error',
           'Invalid account information received.',
@@ -111,7 +109,8 @@ export default function HomeScreen() {
       }
 
       if (!profileResponse.ok) {
-        await SecureStore.deleteItemAsync('timetap_access_token');
+        await deleteToken();
+
         Alert.alert(
           'Profile error',
           typeof profile.detail === 'string'
@@ -121,19 +120,25 @@ export default function HomeScreen() {
         return;
       }
 
-      const role = String(profile.role ?? '').trim().toLowerCase();
+      // Navigate according to account role
+      const role = String(profile.role ?? '')
+        .trim()
+        .toLowerCase();
 
       if (role === 'manager') {
         router.replace('/manager-dashboard');
       } else {
         router.replace('/employee-dashboard');
       }
+
     } catch (error) {
       console.error('TimeTap login error:', error);
+
       Alert.alert(
         'Connection error',
-        'Cannot connect to TimeTap. Check that the backend and LocalTunnel are running and that the tunnel URL is current.',
+        'Cannot connect to TimeTap. Check your internet connection and try again.',
       );
+
     } finally {
       setLoading(false);
     }
@@ -163,6 +168,7 @@ export default function HomeScreen() {
             <Text style={[styles.brand, compact && styles.compactBrand]}>
               TimeTap
             </Text>
+
             <Text style={styles.tagline}>
               RESTAURANT ATTENDANCE
             </Text>
@@ -175,6 +181,7 @@ export default function HomeScreen() {
             >
               Welcome to TimeTap
             </Text>
+
             <Text
               style={[
                 styles.heroSubtitle,
@@ -189,6 +196,7 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, compact && styles.compactTitle]}>
             Log in
           </Text>
+
           <Text
             style={[
               styles.description,
@@ -202,6 +210,7 @@ export default function HomeScreen() {
             <Text style={[styles.label, compact && styles.compactLabel]}>
               Email address
             </Text>
+
             <TextInput
               style={[styles.input, compact && styles.compactInput]}
               value={email}
@@ -219,6 +228,7 @@ export default function HomeScreen() {
             <Text style={[styles.label, compact && styles.compactLabel]}>
               Password
             </Text>
+
             <TextInput
               style={[styles.input, compact && styles.compactInput]}
               value={password}
@@ -274,6 +284,7 @@ export default function HomeScreen() {
             >
               New to TimeTap?
             </Text>
+
             <Text
               style={[
                 styles.registerDescription,

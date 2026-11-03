@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -56,9 +56,7 @@ export default function ScanQRScreen() {
       }
 
       const restaurantId = Number(match[1]);
-      const token = await SecureStore.getItemAsync(
-        'timetap_access_token',
-      );
+      const token = await getToken();
 
       if (!token) {
         throw new Error('Please log in again.');

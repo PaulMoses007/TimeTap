@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getToken, deleteToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -33,9 +33,7 @@ export default function ManagerDashboard() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const token = await SecureStore.getItemAsync(
-          'timetap_access_token',
-        );
+        const token = await getToken();
 
         if (!token) {
           router.replace('/login');
@@ -54,7 +52,7 @@ export default function ManagerDashboard() {
 
         if (!response.ok) {
           if (response.status === 401 || response.status === 403) {
-            await SecureStore.deleteItemAsync('timetap_access_token');
+            await deleteToken();
             router.replace('/login');
             return;
           }
@@ -87,7 +85,7 @@ export default function ManagerDashboard() {
 
   async function logout() {
     try {
-      await SecureStore.deleteItemAsync('timetap_access_token');
+      await deleteToken();
       router.replace('/login');
     } catch {
       Alert.alert('Error', 'Could not log out. Please try again.');

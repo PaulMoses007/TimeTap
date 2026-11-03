@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { getToken, deleteToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -40,9 +40,7 @@ export default function AttendanceScreen() {
     }
 
     try {
-      const token = await SecureStore.getItemAsync(
-        'timetap_access_token',
-      );
+      const token = await getToken();
 
       if (!token) {
         router.replace('/login');
@@ -56,7 +54,6 @@ export default function AttendanceScreen() {
           headers: {
             Accept: 'application/json',
             Authorization: `Bearer ${token}`,
-            'Bypass-Tunnel-Reminder': 'true',
           },
         },
       );
@@ -73,7 +70,7 @@ export default function AttendanceScreen() {
       }
 
       if (response.status === 401 || response.status === 403) {
-        await SecureStore.deleteItemAsync('timetap_access_token');
+        await deleteToken();
         router.replace('/login');
         return;
       }
@@ -125,7 +122,7 @@ export default function AttendanceScreen() {
   const absent = records.filter((r) => r.status === 'Absent').length;
 
   function formatTime(value?: string | null) {
-    if (!value) return 'â€”';
+    if (!value) return '—';
 
     const date = new Date(value);
 
@@ -149,7 +146,7 @@ export default function AttendanceScreen() {
         }
       >
         <Pressable onPress={() => router.replace('/manager-dashboard')}>
-          <Text style={styles.back}>â€¹ Back to dashboard</Text>
+          <Text style={styles.back}>‹ Back to dashboard</Text>
         </Pressable>
 
         <Text style={styles.brand}>TimeTap</Text>

@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { getToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -26,8 +26,12 @@ export default function RegisterRestaurantScreen() {
   const [invitationCode, setInvitationCode] = useState('');
 
   const registerRestaurant = async () => {
-    if (!name.trim() || !address.trim() ||
-        !phone.trim() || !email.trim()) {
+    if (
+      !name.trim() ||
+      !address.trim() ||
+      !phone.trim() ||
+      !email.trim()
+    ) {
       Alert.alert('Missing details', 'Please fill in all four fields.');
       return;
     }
@@ -35,14 +39,12 @@ export default function RegisterRestaurantScreen() {
     setLoading(true);
 
     try {
-      const token = await SecureStore.getItemAsync(
-        'timetap_access_token'
-      );
+      const token = await getToken();
 
       if (!token) {
         Alert.alert(
           'Login required',
-          'Please log in with your manager account first.'
+          'Please log in with your manager account first.',
         );
         return;
       }
@@ -55,7 +57,6 @@ export default function RegisterRestaurantScreen() {
             'Content-Type': 'application/json',
             Accept: 'application/json',
             Authorization: `Bearer ${token}`,
-            'Bypass-Tunnel-Reminder': 'true',
           },
           body: JSON.stringify({
             name: name.trim(),
@@ -63,14 +64,14 @@ export default function RegisterRestaurantScreen() {
             phone: phone.trim(),
             email: email.trim(),
           }),
-        }
+        },
       );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.detail || 'Could not register the restaurant.'
+          data.detail || 'Could not register the restaurant.',
         );
       }
 
@@ -88,12 +89,12 @@ export default function RegisterRestaurantScreen() {
             text: 'Continue',
             onPress: () => router.replace('/manager-dashboard'),
           },
-        ]
+        ],
       );
     } catch (error: any) {
       Alert.alert(
         'Registration failed',
-        error.message || 'Please check your connection and try again.'
+        error.message || 'Please check your connection and try again.',
       );
     } finally {
       setLoading(false);

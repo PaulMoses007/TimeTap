@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,11 +10,11 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { router, useFocusEffect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+} from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { getToken, deleteToken } from '../lib/storage';
 
-const API_BASE_URL = "https://timetap-backend.onrender.com";
+const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
 type Employee = {
   id: number;
@@ -47,38 +47,29 @@ export default function TeamScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busyEmployeeId, setBusyEmployeeId] = useState<number | null>(null);
 
-  const getToken = async () => {
-    const token = await SecureStore.getItemAsync("timetap_access_token");
-
-    if (!token) {
-      router.replace("/login");
-      return null;
-    }
-
-    return token;
-  };
-
   const requestHeaders = (token: string) => ({
     Authorization: `Bearer ${token}`,
-    "Bypass-Tunnel-Reminder": "true",
   });
 
   const fetchEmployees = async () => {
     const token = await getToken();
-    if (!token) return;
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
 
     const response = await fetch(`${API_BASE_URL}/employees/`, {
       headers: requestHeaders(token),
     });
 
     if (response.status === 401 || response.status === 403) {
-      await SecureStore.deleteItemAsync("timetap_access_token");
-      router.replace("/login");
-      throw new Error("Your session has expired. Please log in again.");
+      await deleteToken();
+      router.replace('/login');
+      throw new Error('Your session has expired. Please log in again.');
     }
 
     if (!response.ok) {
-      throw new Error("Could not load employees.");
+      throw new Error('Could not load employees.');
     }
 
     const data = await response.json();
@@ -87,20 +78,23 @@ export default function TeamScreen() {
 
   const fetchPendingEmployees = async () => {
     const token = await getToken();
-    if (!token) return;
+    if (!token) {
+      router.replace('/login');
+      return;
+    }
 
     const response = await fetch(`${API_BASE_URL}/employees/pending`, {
       headers: requestHeaders(token),
     });
 
     if (response.status === 401 || response.status === 403) {
-      await SecureStore.deleteItemAsync("timetap_access_token");
-      router.replace("/login");
-      throw new Error("Your session has expired. Please log in again.");
+      await deleteToken();
+      router.replace('/login');
+      throw new Error('Your session has expired. Please log in again.');
     }
 
     if (!response.ok) {
-      throw new Error("Could not load pending employee requests.");
+      throw new Error('Could not load pending employee requests.');
     }
 
     const data = await response.json();
@@ -113,8 +107,8 @@ export default function TeamScreen() {
     } catch (error) {
       if (showErrors) {
         Alert.alert(
-          "Error",
-          error instanceof Error ? error.message : "Could not load the team."
+          'Error',
+          error instanceof Error ? error.message : 'Could not load the team.',
         );
       }
     } finally {
@@ -127,7 +121,7 @@ export default function TeamScreen() {
     useCallback(() => {
       setLoading(true);
       void loadTeam();
-    }, [])
+    }, []),
   );
 
   const refreshTeam = () => {
@@ -137,13 +131,13 @@ export default function TeamScreen() {
 
   const getEmployeeName = (employee: Employee) => {
     const name =
-      `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim();
+      `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim();
 
     return name || employee.email || `Employee #${employee.id}`;
   };
 
   const formatDateTime = (value?: string | null) => {
-    if (!value) return "â€”";
+    if (!value) return '—';
 
     const date = new Date(value);
 
@@ -156,14 +150,14 @@ export default function TeamScreen() {
 
   const formatDuration = (record: AttendanceRecord) => {
     const minutes =
-      typeof record.worked_minutes === "number"
+      typeof record.worked_minutes === 'number'
         ? record.worked_minutes
-        : typeof record.worked_hours === "number"
+        : typeof record.worked_hours === 'number'
           ? Math.round(record.worked_hours * 60)
           : null;
 
     if (minutes === null) {
-      return record.check_out ? "Not recorded" : "In progress";
+      return record.check_out ? 'Not recorded' : 'In progress';
     }
 
     const hours = Math.floor(minutes / 60);
@@ -178,23 +172,26 @@ export default function TeamScreen() {
   const fetchEmployeeAttendance = async (employee: Employee) => {
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
 
       const response = await fetch(
         `${API_BASE_URL}/attendance/employee/${employee.id}`,
         {
           headers: requestHeaders(token),
-        }
+        },
       );
 
       if (response.status === 401 || response.status === 403) {
-        await SecureStore.deleteItemAsync("timetap_access_token");
-        router.replace("/login");
+        await deleteToken();
+        router.replace('/login');
         return;
       }
 
       if (!response.ok) {
-        throw new Error("Could not load attendance history.");
+        throw new Error('Could not load attendance history.');
       }
 
       const data = await response.json();
@@ -202,8 +199,8 @@ export default function TeamScreen() {
 
       if (records.length === 0) {
         Alert.alert(
-          "Attendance History",
-          `No attendance records found for ${getEmployeeName(employee)}.`
+          'Attendance History',
+          `No attendance records found for ${getEmployeeName(employee)}.`,
         );
         return;
       }
@@ -213,26 +210,26 @@ export default function TeamScreen() {
           const duration = formatDuration(record);
 
           return (
-            `${index + 1}. Date: ${record.work_date ?? "â€”"}\n` +
+            `${index + 1}. Date: ${record.work_date ?? '—'}\n` +
             `Check-in: ${formatDateTime(record.check_in)}\n` +
             `Check-out: ${formatDateTime(record.check_out)}\n` +
             `Duration: ${duration}\n` +
-            `Status: ${record.status ?? "â€”"}`
+            `Status: ${record.status ?? '—'}`
           );
         })
-        .join("\n\n");
+        .join('\n\n');
 
       Alert.alert(
         `Attendance: ${getEmployeeName(employee)}`,
         history,
-        [{ text: "Close" }]
+        [{ text: 'Close' }],
       );
     } catch (error) {
       Alert.alert(
-        "Error",
+        'Error',
         error instanceof Error
           ? error.message
-          : "Could not load attendance history."
+          : 'Could not load attendance history.',
       );
     }
   };
@@ -240,24 +237,24 @@ export default function TeamScreen() {
   const showEmployeeDetails = (employee: Employee) => {
     const details =
       `Employee ID: ${employee.employee_id ?? employee.id}\n` +
-      `Email: ${employee.email ?? "â€”"}\n` +
-      `Phone: ${employee.phone ?? "â€”"}\n` +
-      `Role: ${employee.role ?? "Employee"}\n` +
-      `Restaurant: ${employee.restaurant_name ?? "â€”"}\n` +
-      `Account: ${employee.is_active === false ? "Inactive" : "Active"}\n` +
-      `Approval: ${employee.approval_status ?? "Unknown"}`;
+      `Email: ${employee.email ?? '—'}\n` +
+      `Phone: ${employee.phone ?? '—'}\n` +
+      `Role: ${employee.role ?? 'Employee'}\n` +
+      `Restaurant: ${employee.restaurant_name ?? '—'}\n` +
+      `Account: ${employee.is_active === false ? 'Inactive' : 'Active'}\n` +
+      `Approval: ${employee.approval_status ?? 'Unknown'}`;
 
     const buttons: {
       text: string;
       onPress?: () => void;
-      style?: "cancel" | "default" | "destructive";
+      style?: 'cancel' | 'default' | 'destructive';
     }[] = [
-      { text: "Close", style: "cancel" },
+      { text: 'Close', style: 'cancel' },
     ];
 
-    if ((employee.role ?? "").toLowerCase() !== "manager") {
+    if ((employee.role ?? '').toLowerCase() !== 'manager') {
       buttons.push({
-        text: "View Attendance",
+        text: 'View Attendance',
         onPress: () => {
           void fetchEmployeeAttendance(employee);
         },
@@ -269,80 +266,83 @@ export default function TeamScreen() {
 
   const reviewEmployee = (
     employee: Employee,
-    action: "approve" | "reject"
+    action: 'approve' | 'reject',
   ) => {
     const employeeName = getEmployeeName(employee);
 
     Alert.alert(
-      action === "approve" ? "Approve Employee" : "Reject Employee",
+      action === 'approve' ? 'Approve Employee' : 'Reject Employee',
       `Are you sure you want to ${
-        action === "approve" ? "approve" : "reject"
+        action === 'approve' ? 'approve' : 'reject'
       } ${employeeName}?`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: action === "approve" ? "Approve" : "Reject",
-          style: action === "reject" ? "destructive" : "default",
+          text: action === 'approve' ? 'Approve' : 'Reject',
+          style: action === 'reject' ? 'destructive' : 'default',
           onPress: async () => {
             setBusyEmployeeId(employee.id);
 
             try {
               const token = await getToken();
-              if (!token) return;
+              if (!token) {
+                router.replace('/login');
+                return;
+              }
 
               const response = await fetch(
                 `${API_BASE_URL}/employees/${employee.id}/${action}`,
                 {
-                  method: "PUT",
+                  method: 'PUT',
                   headers: requestHeaders(token),
-                }
+                },
               );
 
               const result = await response.json().catch(() => null);
 
               if (response.status === 401 || response.status === 403) {
-                await SecureStore.deleteItemAsync("timetap_access_token");
-                router.replace("/login");
+                await deleteToken();
+                router.replace('/login');
                 return;
               }
 
               if (!response.ok) {
                 throw new Error(
                   result?.detail ??
-                    `Could not ${action} this employee.`
+                    `Could not ${action} this employee.`,
                 );
               }
 
               Alert.alert(
-                "Success",
+                'Success',
                 `${employeeName} has been ${
-                  action === "approve" ? "approved" : "rejected"
-                }.`
+                  action === 'approve' ? 'approved' : 'rejected'
+                }.`,
               );
 
               await loadTeam(false);
             } catch (error) {
               Alert.alert(
-                "Error",
+                'Error',
                 error instanceof Error
                   ? error.message
-                  : "Something went wrong."
+                  : 'Something went wrong.',
               );
             } finally {
               setBusyEmployeeId(null);
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const renderEmployeeCard = (
     employee: Employee,
-    isPending = false
+    isPending = false,
   ) => {
     const isBusy = busyEmployeeId === employee.id;
-    const status = employee.approval_status ?? "Unknown";
+    const status = employee.approval_status ?? 'Unknown';
 
     return (
       <View key={employee.id} style={styles.employeeCard}>
@@ -352,10 +352,10 @@ export default function TeamScreen() {
               {getEmployeeName(employee)}
             </Text>
             <Text style={styles.employeeEmail}>
-              {employee.email ?? "No email provided"}
+              {employee.email ?? 'No email provided'}
             </Text>
             <Text style={styles.employeeRole}>
-              {employee.role ?? "Employee"}
+              {employee.role ?? 'Employee'}
             </Text>
           </View>
 
@@ -364,9 +364,9 @@ export default function TeamScreen() {
               styles.statusBadge,
               isPending
                 ? styles.pendingBadge
-                : status.toLowerCase() === "approved"
+                : status.toLowerCase() === 'approved'
                   ? styles.approvedBadge
-                  : status.toLowerCase() === "rejected"
+                  : status.toLowerCase() === 'rejected'
                     ? styles.rejectedBadge
                     : styles.neutralBadge,
             ]}
@@ -376,11 +376,11 @@ export default function TeamScreen() {
         </View>
 
         <Text style={styles.restaurantText}>
-          Restaurant: {employee.restaurant_name ?? "Not specified"}
+          Restaurant: {employee.restaurant_name ?? 'Not specified'}
         </Text>
 
         <Text style={styles.activeText}>
-          Account: {employee.is_active === false ? "Inactive" : "Active"}
+          Account: {employee.is_active === false ? 'Inactive' : 'Active'}
         </Text>
 
         <TouchableOpacity
@@ -398,10 +398,10 @@ export default function TeamScreen() {
                 isBusy && styles.disabledButton,
               ]}
               disabled={isBusy}
-              onPress={() => reviewEmployee(employee, "approve")}
+              onPress={() => reviewEmployee(employee, 'approve')}
             >
               <Text style={styles.actionButtonText}>
-                {isBusy ? "Please wait..." : "Approve"}
+                {isBusy ? 'Please wait...' : 'Approve'}
               </Text>
             </TouchableOpacity>
 
@@ -411,10 +411,10 @@ export default function TeamScreen() {
                 isBusy && styles.disabledButton,
               ]}
               disabled={isBusy}
-              onPress={() => reviewEmployee(employee, "reject")}
+              onPress={() => reviewEmployee(employee, 'reject')}
             >
               <Text style={styles.actionButtonText}>
-                {isBusy ? "Please wait..." : "Reject"}
+                {isBusy ? 'Please wait...' : 'Reject'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -464,7 +464,7 @@ export default function TeamScreen() {
           <Text style={styles.summaryNumber}>{employees.length}</Text>
           <Text style={styles.summaryNote}>
             {pendingEmployees.length} pending approval
-            {pendingEmployees.length === 1 ? "" : "s"}
+            {pendingEmployees.length === 1 ? '' : 's'}
           </Text>
         </View>
 
@@ -486,7 +486,7 @@ export default function TeamScreen() {
           </View>
         ) : (
           pendingEmployees.map((employee) =>
-            renderEmployeeCard(employee, true)
+            renderEmployeeCard(employee, true),
           )
         )}
 
@@ -524,7 +524,7 @@ export default function TeamScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3f6fb",
+    backgroundColor: '#f3f6fb',
   },
   content: {
     padding: 18,
@@ -532,76 +532,76 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f3f6fb",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f6fb',
   },
   loadingText: {
     marginTop: 12,
-    color: "#475569",
+    color: '#475569',
     fontSize: 15,
   },
   pageHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
   title: {
     fontSize: 28,
-    fontWeight: "800",
-    color: "#172554",
+    fontWeight: '800',
+    color: '#172554',
   },
   subtitle: {
     marginTop: 5,
     fontSize: 13,
-    color: "#64748b",
+    color: '#64748b',
   },
   refreshButton: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: '#dbeafe',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
   },
   refreshButtonText: {
-    color: "#1d4ed8",
-    fontWeight: "700",
+    color: '#1d4ed8',
+    fontWeight: '700',
   },
   summaryCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: '#e2e8f0',
   },
   summaryLabel: {
-    color: "#64748b",
+    color: '#64748b',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   summaryNumber: {
     marginTop: 5,
-    color: "#172554",
+    color: '#172554',
     fontSize: 36,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   summaryNote: {
     marginTop: 5,
-    color: "#b45309",
+    color: '#b45309',
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
     marginTop: 4,
   },
   sectionTitle: {
-    color: "#172554",
+    color: '#172554',
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   countBadge: {
     marginLeft: 10,
@@ -609,47 +609,47 @@ const styles = StyleSheet.create({
     height: 26,
     paddingHorizontal: 7,
     borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#dbeafe",
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dbeafe',
   },
   countBadgeText: {
-    color: "#1d4ed8",
-    fontWeight: "800",
+    color: '#1d4ed8',
+    fontWeight: '800',
     fontSize: 12,
   },
   employeeCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: '#e2e8f0',
   },
   employeeHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   employeeInfo: {
     flex: 1,
     paddingRight: 8,
   },
   employeeName: {
-    color: "#172554",
+    color: '#172554',
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   employeeEmail: {
     marginTop: 4,
-    color: "#64748b",
+    color: '#64748b',
     fontSize: 13,
   },
   employeeRole: {
     marginTop: 5,
-    color: "#475569",
+    color: '#475569',
     fontSize: 13,
-    textTransform: "capitalize",
+    textTransform: 'capitalize',
   },
   statusBadge: {
     paddingHorizontal: 9,
@@ -657,30 +657,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   pendingBadge: {
-    backgroundColor: "#fef3c7",
+    backgroundColor: '#fef3c7',
   },
   approvedBadge: {
-    backgroundColor: "#dcfce7",
+    backgroundColor: '#dcfce7',
   },
   rejectedBadge: {
-    backgroundColor: "#fee2e2",
+    backgroundColor: '#fee2e2',
   },
   neutralBadge: {
-    backgroundColor: "#e2e8f0",
+    backgroundColor: '#e2e8f0',
   },
   statusText: {
-    color: "#334155",
+    color: '#334155',
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   restaurantText: {
     marginTop: 12,
-    color: "#475569",
+    color: '#475569',
     fontSize: 13,
   },
   activeText: {
     marginTop: 5,
-    color: "#475569",
+    color: '#475569',
     fontSize: 13,
   },
   detailsButton: {
@@ -688,70 +688,70 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: "#bfdbfe",
-    alignItems: "center",
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
   },
   detailsButtonText: {
-    color: "#1d4ed8",
+    color: '#1d4ed8',
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   actionRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 10,
     marginTop: 10,
   },
   approveButton: {
     flex: 1,
-    backgroundColor: "#15803d",
+    backgroundColor: '#15803d',
     paddingVertical: 12,
     borderRadius: 9,
-    alignItems: "center",
+    alignItems: 'center',
   },
   rejectButton: {
     flex: 1,
-    backgroundColor: "#dc2626",
+    backgroundColor: '#dc2626',
     paddingVertical: 12,
     borderRadius: 9,
-    alignItems: "center",
+    alignItems: 'center',
   },
   disabledButton: {
     opacity: 0.55,
   },
   actionButtonText: {
-    color: "#ffffff",
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   emptyCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: '#e2e8f0',
   },
   emptyTitle: {
-    color: "#172554",
+    color: '#172554',
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: '800',
   },
   emptyText: {
     marginTop: 6,
-    color: "#64748b",
+    color: '#64748b',
     fontSize: 13,
     lineHeight: 19,
   },
   backButton: {
     marginTop: 12,
-    backgroundColor: "#e2e8f0",
+    backgroundColor: '#e2e8f0',
     paddingVertical: 14,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   backButtonText: {
-    color: "#334155",
-    fontWeight: "800",
+    color: '#334155',
+    fontWeight: '800',
     fontSize: 14,
   },
 });

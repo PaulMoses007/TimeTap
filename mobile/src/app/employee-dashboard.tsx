@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { getToken, deleteToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -64,7 +64,7 @@ export default function EmployeeDashboard() {
     method = 'GET',
     body?: object,
   ) => {
-    const token = await SecureStore.getItemAsync('timetap_access_token');
+    const token = await getToken();
 
     if (!token) {
       router.replace('/login');
@@ -84,8 +84,9 @@ export default function EmployeeDashboard() {
     const data = await readResponse(response);
 
     if (response.status === 401 || response.status === 403) {
-      await SecureStore.deleteItemAsync('timetap_access_token');
+      await deleteToken();
       router.replace('/login');
+
       throw new Error(
         typeof data.detail === 'string'
           ? data.detail
@@ -171,8 +172,12 @@ export default function EmployeeDashboard() {
   }
 
   async function logout() {
-    await SecureStore.deleteItemAsync('timetap_access_token');
-    router.replace('/login');
+    try {
+      await deleteToken();
+      router.replace('/login');
+    } catch {
+      Alert.alert('Error', 'Could not log out. Please try again.');
+    }
   }
 
   const isCheckedIn = history.some((record) => record.check_out == null);
@@ -212,16 +217,20 @@ export default function EmployeeDashboard() {
               ? `${profile.first_name} ${profile.last_name}`
               : 'Employee'}
           </Text>
+
           <Text style={styles.info}>ID: {profile?.employee_id ?? '—'}</Text>
           <Text style={styles.info}>Role: {profile?.role ?? '—'}</Text>
+
           <Text style={styles.info}>
             Restaurant: {profile?.restaurant_name ?? 'Not assigned'}
           </Text>
+
           <Text style={styles.info}>Email: {profile?.email ?? '—'}</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today's Attendance</Text>
+
           <Text style={styles.subtitle}>
             Scan your restaurant QR code or use the attendance buttons.
           </Text>
@@ -289,17 +298,21 @@ export default function EmployeeDashboard() {
             history.map((record) => (
               <View key={record.id} style={styles.historyItem}>
                 <Text style={styles.historyDate}>{record.work_date}</Text>
+
                 <Text style={styles.info}>
                   Check-in: {formatTime(record.check_in)}
                 </Text>
+
                 <Text style={styles.info}>
                   Check-out: {formatTime(record.check_out)}
                 </Text>
+
                 <Text style={styles.info}>
                   Hours worked:{' '}
                   {record.worked_minutes ??
                     Math.round((record.worked_hours ?? 0) * 60)} minutes
                 </Text>
+
                 <Text style={styles.info}>Status: {record.status}</Text>
               </View>
             ))

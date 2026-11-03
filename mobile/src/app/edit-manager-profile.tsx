@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { getToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -28,9 +28,7 @@ export default function EditManagerProfile() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const token = await SecureStore.getItemAsync(
-          'timetap_access_token',
-        );
+        const token = await getToken();
 
         if (!token) {
           router.replace('/login');
@@ -90,9 +88,7 @@ export default function EditManagerProfile() {
     setSaving(true);
 
     try {
-      const token = await SecureStore.getItemAsync(
-        'timetap_access_token',
-      );
+      const token = await getToken();
 
       if (!token) {
         router.replace('/login');

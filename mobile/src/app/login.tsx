@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { setToken, deleteToken } from '../lib/storage';
 
 const API_BASE_URL = 'https://timetap-backend.onrender.com';
 
@@ -74,11 +74,8 @@ export default function LoginScreen() {
         return;
       }
 
-      // STEP 2: Save access token
-      await SecureStore.setItemAsync(
-        'timetap_access_token',
-        data.access_token,
-      );
+      // STEP 2: Save access token using platform-compatible storage
+      await setToken(data.access_token);
 
       // STEP 3: Load employee profile
       const profileResponse = await fetch(
@@ -99,7 +96,7 @@ export default function LoginScreen() {
       try {
         profile = JSON.parse(profileText);
       } catch {
-        await SecureStore.deleteItemAsync('timetap_access_token');
+        await deleteToken();
 
         Alert.alert(
           'Profile response error',
@@ -109,7 +106,7 @@ export default function LoginScreen() {
       }
 
       if (!profileResponse.ok) {
-        await SecureStore.deleteItemAsync('timetap_access_token');
+        await deleteToken();
 
         Alert.alert(
           'Profile error',
@@ -136,7 +133,9 @@ export default function LoginScreen() {
 
       Alert.alert(
         'Connection error',
-        'Cannot reach TimeTap. Check your internet connection and try again.',
+        error instanceof Error
+          ? error.message
+          : 'Cannot reach TimeTap. Check your internet connection and try again.',
       );
 
     } finally {
