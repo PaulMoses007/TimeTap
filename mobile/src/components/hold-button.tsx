@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   label: string;
@@ -12,6 +12,14 @@ type Props = {
 };
 
 const TICK_MS = 100;
+
+const webNoSelect = {
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+  WebkitTapHighlightColor: 'transparent',
+  touchAction: 'none',
+};
 
 /**
  * A button that only fires after being held down for `seconds`.
@@ -99,7 +107,11 @@ export default function HoldButton({
         // be forgiving if the finger slides a little while holding
         pressRetentionOffset={{ top: 300, bottom: 300, left: 300, right: 300 }}
         disabled={disabled || loading}
+        // Phone browsers turn a long press into a text-selection / context menu
+        // and cancel the touch after ~0.5 s. Block that so the hold keeps counting.
+        {...(Platform.OS === 'web' ? ({ onContextMenu: (e: any) => e.preventDefault() } as any) : {})}
         style={[
+          Platform.OS === 'web' ? (webNoSelect as any) : null,
           styles.button,
           isPrimary ? styles.primary : styles.secondary,
           (disabled || loading) && styles.disabled,

@@ -16,11 +16,11 @@ import {
 import { Alert } from '../lib/alert';
 
 import { useFocusEffect, router } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 import { getToken } from '../lib/storage';
+import { copyText } from '../lib/copy';
 
 import { API_BASE_URL } from '../lib/config';
 
@@ -95,11 +95,15 @@ export default function RestaurantsScreen() {
   );
 
   async function copyInvitationCode(code: string) {
-    try {
-      await Clipboard.setStringAsync(code);
+    const ok = await copyText(code);
+
+    if (ok) {
       Alert.alert('Copied', 'Employee invitation code copied.');
-    } catch {
-      Alert.alert('Error', 'Could not copy the invitation code.');
+    } else if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // Last resort: show the code in a box the person can long-press and copy
+      window.prompt('Copy this invitation code:', code);
+    } else {
+      Alert.alert('Invitation code', code);
     }
   }
 
