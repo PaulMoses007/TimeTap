@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,10 +10,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { router } from 'expo-router';
 import { getToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 export default function EditManagerProfile() {
   const [loading, setLoading] = useState(true);

@@ -2,7 +2,6 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,11 +9,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { getToken, deleteToken } from '../lib/storage';
+import { deleteToken } from '../lib/storage';
+import { apiRequest as callApi } from '../lib/api';
+import HoldButton from '../components/hold-button';
+import { SOURCE_LABELS, formatDate, formatMinutes, formatTime } from '../lib/time';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 type Profile = {
   id: number;
@@ -36,19 +39,9 @@ type AttendanceRecord = {
   worked_minutes: number;
   worked_hours: number;
   status: string;
+  source?: string | null;
+  check_out_source?: string | null;
 };
-
-async function readResponse(response: Response): Promise<any> {
-  const text = await response.text();
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(
-      `Unexpected server response (HTTP ${response.status}). Please try again.`,
-    );
-  }
-}
 
 export default function EmployeeDashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -59,51 +52,9 @@ export default function EmployeeDashboard() {
     'check-in' | 'check-out' | null
   >(null);
 
-  const apiRequest = async (
-    path: string,
-    method = 'GET',
-    body?: object,
-  ) => {
-    const token = await getToken();
-
-    if (!token) {
-      router.replace('/login');
-      throw new Error('Please log in again.');
-    }
-
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-
-    const data = await readResponse(response);
-
-    if (response.status === 401 || response.status === 403) {
-      await deleteToken();
-      router.replace('/login');
-
-      throw new Error(
-        typeof data.detail === 'string'
-          ? data.detail
-          : 'Your session expired or access was denied. Please log in again.',
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        typeof data.detail === 'string'
-          ? data.detail
-          : `Request failed (HTTP ${response.status}).`,
-      );
-    }
-
-    return data;
-  };
+  // Shared client: friendly errors, 401 -> login, 403 is only an error message
+  const apiRequest = (path: string, method = 'GET', body?: object) =>
+    callApi(path, { method, body });
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -149,6 +100,7 @@ export default function EmployeeDashboard() {
     try {
       await apiRequest(`/attendance/${action}`, 'POST', {
         restaurant_id: profile.restaurant_id,
+        source: 'button',
       });
 
       await loadDashboard();
@@ -231,9 +183,13 @@ export default function EmployeeDashboard() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today's Attendance</Text>
 
-          <Text style={styles.subtitle}>
-            Scan your restaurant QR code or use the attendance buttons.
+          <Text style={styles.info}>
+            {isCheckedIn
+              ? 'Your shift is in progress.'
+              : 'You are not currently checked in.'}
           </Text>
+
+          <Text style={styles.sectionLabel}>Main method</Text>
 
           <Pressable
             style={[
@@ -243,47 +199,43 @@ export default function EmployeeDashboard() {
             disabled={actionLoading !== null}
             onPress={() => router.push('/scan-qr')}
           >
-            <Text style={styles.primaryButtonText}>Scan QR Code</Text>
+            <Text style={styles.primaryButtonText}>
+              {isCheckedIn ? 'Scan QR to Check Out' : 'Scan QR to Check In'}
+            </Text>
           </Pressable>
 
-          <Text style={styles.info}>
-            {isCheckedIn
-              ? 'Your shift is in progress.'
-              : 'You are not currently checked in.'}
+          <Text style={styles.sectionLabel}>
+            No QR code? Press and hold the button
           </Text>
 
-          <Pressable
-            style={[
-              styles.primaryButton,
-              (actionLoading !== null || isCheckedIn) &&
-                styles.disabledButton,
-            ]}
-            disabled={actionLoading !== null || isCheckedIn}
-            onPress={() => recordAttendance('check-in')}
-          >
-            {actionLoading === 'check-in' ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                {isCheckedIn ? 'Already Checked In' : 'Check In'}
-              </Text>
-            )}
-          </Pressable>
+          {isCheckedIn ? (
+            <HoldButton
+              key="out"
+              label="Hold to Check Out"
+              variant="secondary"
+              loading={actionLoading === 'check-out'}
+              disabled={actionLoading !== null}
+              onComplete={() => recordAttendance('check-out')}
+            />
+          ) : (
+            <HoldButton
+              key="in"
+              label="Hold to Check In"
+              loading={actionLoading === 'check-in'}
+              disabled={actionLoading !== null}
+              onComplete={() => recordAttendance('check-in')}
+            />
+          )}
+
+          <Text style={styles.sectionLabel}>Forgot to check in or out?</Text>
 
           <Pressable
-            style={[
-              styles.secondaryButton,
-              (actionLoading !== null || !isCheckedIn) &&
-                styles.disabledButton,
-            ]}
-            disabled={actionLoading !== null || !isCheckedIn}
-            onPress={() => recordAttendance('check-out')}
+            style={styles.linkButton}
+            onPress={() => router.push('/manual-request')}
           >
-            {actionLoading === 'check-out' ? (
-              <ActivityIndicator color="#2463EB" />
-            ) : (
-              <Text style={styles.secondaryButtonText}>Check Out</Text>
-            )}
+            <Text style={styles.linkButtonText}>
+              Request manual attendance
+            </Text>
           </Pressable>
         </View>
 
@@ -297,7 +249,7 @@ export default function EmployeeDashboard() {
           ) : (
             history.map((record) => (
               <View key={record.id} style={styles.historyItem}>
-                <Text style={styles.historyDate}>{record.work_date}</Text>
+                <Text style={styles.historyDate}>{formatDate(record.work_date)}</Text>
 
                 <Text style={styles.info}>
                   Check-in: {formatTime(record.check_in)}
@@ -309,8 +261,19 @@ export default function EmployeeDashboard() {
 
                 <Text style={styles.info}>
                   Hours worked:{' '}
-                  {record.worked_minutes ??
-                    Math.round((record.worked_hours ?? 0) * 60)} minutes
+                  {record.check_out
+                    ? formatMinutes(
+                        record.worked_minutes ??
+                          Math.round((record.worked_hours ?? 0) * 60),
+                      )
+                    : '—'}
+                </Text>
+
+                <Text style={styles.info}>
+                  Via: {SOURCE_LABELS[record.source ?? ''] ?? '—'}
+                  {record.check_out
+                    ? ` / ${SOURCE_LABELS[record.check_out_source ?? ''] ?? '—'}`
+                    : ''}
                 </Text>
 
                 <Text style={styles.info}>Status: {record.status}</Text>
@@ -325,19 +288,6 @@ export default function EmployeeDashboard() {
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function formatTime(value: string | null) {
-  if (!value) return '—';
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
 }
 
 const styles = StyleSheet.create({
@@ -411,6 +361,21 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   disabledButton: { opacity: 0.55 },
+  sectionLabel: {
+    color: '#173D75',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 22,
+  },
+  linkButton: {
+    borderWidth: 1,
+    borderColor: '#2463EB',
+    padding: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  linkButtonText: { color: '#2463EB', fontSize: 16, fontWeight: '700' },
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,

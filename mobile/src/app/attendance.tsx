@@ -2,7 +2,6 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -11,10 +10,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { useFocusEffect, router } from 'expo-router';
 import { getToken, deleteToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 type AttendanceRecord = {
   employee_id: string;

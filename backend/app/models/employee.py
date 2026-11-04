@@ -167,6 +167,13 @@ class Employee(Base):
         nullable=True
     )
 
+    # Set when a manager deletes the employee. The row is kept so
+    # attendance history stays intact; the employee is hidden everywhere.
+    deleted_at = Column(
+        DateTime,
+        nullable=True
+    )
+
     # --------------------------------------------------
     # TIMESTAMPS
     # --------------------------------------------------

@@ -484,7 +484,8 @@ def employee_check_in(
     return check_in(
         attendance.restaurant_id,
         current_user,
-        db
+        db,
+        attendance.source
     )
 
 
@@ -508,7 +509,8 @@ def employee_check_out(
     return check_out(
         attendance.restaurant_id,
         current_user,
-        db
+        db,
+        attendance.source
     )
 
 

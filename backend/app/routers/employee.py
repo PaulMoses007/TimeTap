@@ -168,7 +168,8 @@ def get_all_employees(
     employees = (
         db.query(Employee)
         .filter(
-            Employee.restaurant_id.in_(managed_restaurant_ids)
+            Employee.restaurant_id.in_(managed_restaurant_ids),
+            Employee.deleted_at.is_(None)
         )
         .all()
     )
@@ -202,6 +203,7 @@ def get_pending_employees(
         db.query(Employee)
         .filter(
             Employee.approval_status == "Pending",
+            Employee.deleted_at.is_(None),
             Employee.restaurant_id.in_(managed_restaurant_ids)
         )
         .all()
@@ -445,7 +447,7 @@ def get_employee(
             detail="Access denied"
         )
 
-    if employee is None:
+    if employee is None or employee.deleted_at is not None:
         raise HTTPException(
             status_code=404,
             detail="Employee not found"
@@ -565,6 +567,7 @@ def delete_employee(
         )
         .filter(
             Employee.id == employee_id,
+            Employee.deleted_at.is_(None),
             Restaurant.manager_id == manager_id
         )
         .first()
@@ -576,7 +579,19 @@ def delete_employee(
             detail="Employee not found"
         )
 
-    db.delete(employee)
+    if employee.id == manager_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot delete your own account"
+        )
+
+    # Soft delete: attendance history references this employee, so the
+    # row is kept but disabled and hidden. The email is released so the
+    # same address can be registered again later.
+    employee.deleted_at = datetime.utcnow()
+    employee.is_active = False
+    employee.email = f"deleted-{employee.id}-{int(employee.deleted_at.timestamp())}@deleted.invalid"
+
     db.commit()
 
     return {

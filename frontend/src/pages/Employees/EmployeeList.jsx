@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   Alert,
@@ -11,6 +12,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   FormControl,
   IconButton,
@@ -33,10 +35,12 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 import {
   createEmployee,
+  deleteEmployee,
   getEmployees,
   approveEmployee,
   rejectEmployee,
@@ -47,9 +51,14 @@ import {
 import { getRestaurants } from "../../services/restaurantService";
 
 import ManagerSidebar from "../../components/ManagerSidebar";
+import { formatDate, formatMinutes, formatTime } from "../../utils/time";
+import SourceChip from "../../components/SourceChip";
 
 
 function EmployeeList() {
+  const navigate = useNavigate();
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [restaurants, setRestaurants] = useState([]);
 
@@ -79,6 +88,7 @@ function EmployeeList() {
     email: "",
     phone: "",
     role: "Employee",
+    restaurant_id: "",
     password: "",
   });
 
@@ -166,6 +176,9 @@ function EmployeeList() {
       email: "",
       phone: "",
       role: "Employee",
+      // pre-select when the manager has only one restaurant
+      restaurant_id:
+        restaurants.length === 1 ? String(restaurants[0].id) : "",
       password: "",
     });
 
@@ -191,7 +204,16 @@ function EmployeeList() {
     setError("");
 
     try {
-      await createEmployee(formData);
+      if (!formData.restaurant_id) {
+        setError("Please choose a restaurant for the new employee.");
+        setSaving(false);
+        return;
+      }
+
+      await createEmployee({
+        ...formData,
+        restaurant_id: Number(formData.restaurant_id),
+      });
 
       setOpenDialog(false);
 
@@ -209,6 +231,37 @@ function EmployeeList() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+
+  // --------------------------------------------------
+  // Delete Employee
+  // --------------------------------------------------
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteEmployee(deleteTarget.id);
+
+      setSuccessMessage("Employee deleted.");
+      setDeleteTarget(null);
+
+      await loadEmployees();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.detail ||
+          "Failed to delete employee."
+      );
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -631,8 +684,21 @@ function EmployeeList() {
                           </TableCell>
 
                           <TableCell>
-                            {employee.first_name}{" "}
-                            {employee.last_name}
+                            <Typography
+                              component="span"
+                              fontWeight="500"
+                              color="primary"
+                              sx={{
+                                cursor: "pointer",
+                                "&:hover": { textDecoration: "underline" },
+                              }}
+                              onClick={() =>
+                                navigate(`/employees/${employee.id}`)
+                              }
+                            >
+                              {employee.first_name}{" "}
+                              {employee.last_name}
+                            </Typography>
                           </TableCell>
 
                           <TableCell>
@@ -705,6 +771,18 @@ function EmployeeList() {
                                   aria-label={`View attendance for ${employee.first_name}`}
                                 >
                                   <AccessTimeIcon />
+                                </IconButton>
+                              </Tooltip>
+
+                              {/* DELETE */}
+
+                              <Tooltip title="Delete employee">
+                                <IconButton
+                                  color="error"
+                                  onClick={() => setDeleteTarget(employee)}
+                                  aria-label={`Delete ${employee.first_name}`}
+                                >
+                                  <DeleteIcon />
                                 </IconButton>
                               </Tooltip>
 
@@ -940,6 +1018,30 @@ function EmployeeList() {
               </FormControl>
 
 
+              <FormControl
+                fullWidth
+                required
+                margin="normal"
+              >
+                <InputLabel>
+                  Restaurant
+                </InputLabel>
+                <Select
+                  label="Restaurant"
+                  name="restaurant_id"
+                  value={formData.restaurant_id}
+                  onChange={handleChange}
+                >
+                  {restaurants.map((restaurant) => (
+                    <MenuItem
+                      key={restaurant.id}
+                      value={String(restaurant.id)}
+                    >
+                      {restaurant.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 fullWidth
                 required
@@ -1126,6 +1228,46 @@ function EmployeeList() {
         </Dialog>
 
 
+        {/* DELETE CONFIRMATION */}
+
+        <Dialog
+          open={Boolean(deleteTarget)}
+          onClose={() => !deleting && setDeleteTarget(null)}
+        >
+          <DialogTitle fontWeight="bold">
+            Delete employee?
+          </DialogTitle>
+
+          <DialogContent>
+            <DialogContentText>
+              {deleteTarget?.first_name} {deleteTarget?.last_name} will lose
+              access and disappear from this list. Their past attendance
+              records are kept for your reports.
+            </DialogContentText>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <CircularProgress size={22} color="inherit" />
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* EMPLOYEE ATTENDANCE HISTORY DIALOG */}
 
         <Dialog
@@ -1167,6 +1309,8 @@ function EmployeeList() {
                       <TableCell><strong>Check In</strong></TableCell>
                       <TableCell><strong>Check Out</strong></TableCell>
                       <TableCell><strong>Hours Worked</strong></TableCell>
+                      <TableCell><strong>In via</strong></TableCell>
+                      <TableCell><strong>Out via</strong></TableCell>
                       <TableCell><strong>Status</strong></TableCell>
                     </TableRow>
                   </TableHead>
@@ -1174,56 +1318,28 @@ function EmployeeList() {
                   <TableBody>
                     {attendanceRecords.map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>
-                          {record.work_date
-                            ? new Date(`${record.work_date}T12:00:00`).toLocaleDateString()
-                            : "-"}
-                        </TableCell>
+                        <TableCell>{formatDate(record.work_date)}</TableCell>
 
-                        <TableCell>
-                          {record.check_in
-                            ? new Date(record.check_in).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : "-"}
-                        </TableCell>
+                        <TableCell>{formatTime(record.check_in)}</TableCell>
 
                         <TableCell>
                           {record.check_out
-                            ? new Date(record.check_out).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                            ? formatTime(record.check_out)
                             : "Not checked out"}
                         </TableCell>
 
                         <TableCell>
-                          {(() => {
-  const minutes =
-    record.worked_minutes != null
-      ? Number(record.worked_minutes)
-      : record.worked_hours != null
-        ? Math.round(Number(record.worked_hours) * 60)
-        : null;
+                          {record.check_out
+                            ? formatMinutes(record.worked_minutes)
+                            : "-"}
+                        </TableCell>
 
-  if (minutes == null || !Number.isFinite(minutes)) {
-    return "-";
-  }
+                        <TableCell>
+                          <SourceChip source={record.source} />
+                        </TableCell>
 
-  if (minutes < 60) {
-    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  if (remainingMinutes === 0) {
-    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-  }
-
-  return `${hours} ${hours === 1 ? "hour" : "hours"} ${remainingMinutes} min`;
-})()}
+                        <TableCell>
+                          <SourceChip source={record.check_out_source} />
                         </TableCell>
 
                         <TableCell>

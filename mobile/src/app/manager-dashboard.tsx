@@ -1,9 +1,8 @@
 
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,9 +10,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { getToken, deleteToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
+import { apiRequest } from '../lib/api';
 
 type ManagerProfile = {
   first_name: string;
@@ -29,6 +30,17 @@ type ManagerProfile = {
 export default function ManagerDashboard() {
   const [checking, setChecking] = useState(true);
   const [profile, setProfile] = useState<ManagerProfile | null>(null);
+
+  const [pendingRequests, setPendingRequests] = useState(0);
+
+  // refresh the badge every time the dashboard comes back into view
+  useFocusEffect(
+    useCallback(() => {
+      apiRequest<unknown[]>('/attendance/manual-requests/?status=Pending')
+        .then((data) => setPendingRequests(Array.isArray(data) ? data.length : 0))
+        .catch(() => setPendingRequests(0));
+    }, []),
+  );
 
   useEffect(() => {
     async function loadDashboard() {
@@ -225,6 +237,28 @@ export default function ManagerDashboard() {
 
           <Text style={styles.link}>
             View attendance →
+          </Text>
+        </Pressable>
+
+        {/* Manual attendance requests */}
+        <Pressable
+          style={styles.card}
+          onPress={() => router.push('/manager-requests')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.cardTitle}>
+            Manual Requests{pendingRequests > 0 ? ` (${pendingRequests})` : ''}
+          </Text>
+
+          <Text style={styles.cardDescription}>
+            Approve or reject check-ins and check-outs your employees
+            could not record by QR.
+          </Text>
+
+          <Text style={styles.link}>
+            {pendingRequests > 0
+              ? `${pendingRequests} waiting for review →`
+              : 'Review requests →'}
           </Text>
         </Pressable>
 

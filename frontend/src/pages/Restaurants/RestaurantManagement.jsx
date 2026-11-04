@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
   Paper,
@@ -28,6 +29,7 @@ import CheckIcon from "@mui/icons-material/Check";
 
 import {
   getRestaurants,
+  deleteRestaurant,
 } from "../../services/restaurantService";
 
 import ManagerSidebar from "../../components/ManagerSidebar";
@@ -62,6 +64,12 @@ function RestaurantManagement() {
 
   const [copiedRestaurantId, setCopiedRestaurantId] =
     useState(null);
+
+  const [deleteTarget, setDeleteTarget] =
+    useState(null);
+
+  const [deleting, setDeleting] =
+    useState(false);
 
 
   // ==================================================
@@ -176,6 +184,33 @@ function RestaurantManagement() {
   // ==================================================
   // OPEN ATTENDANCE QR
   // ==================================================
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteRestaurant(deleteTarget.id);
+
+      setDeleteTarget(null);
+      await loadRestaurants();
+    } catch (err) {
+      console.error(err);
+
+      // e.g. "This restaurant still has 2 employees. Delete or move them first."
+      setError(
+        err.response?.data?.detail ||
+          "Failed to delete restaurant."
+      );
+
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
 
   const handleOpenQr = async (restaurant) => {
 
@@ -702,14 +737,6 @@ function RestaurantManagement() {
                           </Typography>
 
 
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                          >
-                            Restaurant #
-                            {restaurant.id}
-                          </Typography>
-
                         </Box>
 
                       </Box>
@@ -910,7 +937,9 @@ function RestaurantManagement() {
                           startIcon={
                             <DeleteIcon />
                           }
-                          disabled
+                          onClick={() =>
+                            setDeleteTarget(restaurant)
+                          }
                           fullWidth
                         >
                           Delete
@@ -937,6 +966,41 @@ function RestaurantManagement() {
       {/* ==================================================
           ATTENDANCE QR DIALOG
       ================================================== */}
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+      >
+        <DialogTitle sx={{ fontWeight: "bold" }}>
+          Delete restaurant?
+        </DialogTitle>
+
+        <DialogContent>
+          <DialogContentText>
+            {deleteTarget?.name} will be removed. Its attendance QR code
+            and employee invitation code will stop working. Attendance
+            history of former employees is kept. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleting}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmDelete}
+            disabled={deleting}
+          >
+            {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={qrDialogOpen}

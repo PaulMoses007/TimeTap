@@ -2,7 +2,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -11,10 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { router, useFocusEffect } from 'expo-router';
 import { getToken, deleteToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 type Employee = {
   id: number;
@@ -348,7 +348,15 @@ export default function TeamScreen() {
       <View key={employee.id} style={styles.employeeCard}>
         <View style={styles.employeeHeader}>
           <View style={styles.employeeInfo}>
-            <Text style={styles.employeeName}>
+            <Text
+              style={styles.employeeName}
+              onPress={() =>
+                router.push({
+                  pathname: '/employee-detail',
+                  params: { id: String(employee.id) },
+                })
+              }
+            >
               {getEmployeeName(employee)}
             </Text>
             <Text style={styles.employeeEmail}>
@@ -385,9 +393,14 @@ export default function TeamScreen() {
 
         <TouchableOpacity
           style={styles.detailsButton}
-          onPress={() => showEmployeeDetails(employee)}
+          onPress={() =>
+            router.push({
+              pathname: '/employee-detail',
+              params: { id: String(employee.id) },
+            })
+          }
         >
-          <Text style={styles.detailsButtonText}>View Details</Text>
+          <Text style={styles.detailsButtonText}>View Account</Text>
         </TouchableOpacity>
 
         {isPending && (
@@ -459,6 +472,13 @@ export default function TeamScreen() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity
+          style={styles.addEmployeeButton}
+          onPress={() => router.push('/add-employee')}
+        >
+          <Text style={styles.addEmployeeText}>+ Add Employee</Text>
+        </TouchableOpacity>
+
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total Employees</Text>
           <Text style={styles.summaryNumber}>{employees.length}</Text>
@@ -522,6 +542,14 @@ export default function TeamScreen() {
 }
 
 const styles = StyleSheet.create({
+  addEmployeeButton: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  addEmployeeText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   container: {
     flex: 1,
     backgroundColor: '#f3f6fb',

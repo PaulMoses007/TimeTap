@@ -11,6 +11,7 @@ from app.core.database import SessionLocal
 
 from app.models.restaurant import Restaurant
 from app.models.employee import Employee
+from app.models.attendance import ManualAttendanceRequest
 
 from app.qr.qr_generator import generate_restaurant_qr
 
@@ -312,7 +313,8 @@ def get_restaurant_employees(
         db.query(Employee)
         .filter(
             Employee.restaurant_id ==
-            restaurant_id
+            restaurant_id,
+            Employee.deleted_at.is_(None)
         )
         .all()
     )
@@ -395,17 +397,41 @@ def delete_restaurant(
             detail="Restaurant not found"
         )
 
-    employees = (
+    # A restaurant that still has staff cannot be deleted
+    active_staff = (
         db.query(Employee)
         .filter(
-            Employee.restaurant_id ==
-            restaurant_id
+            Employee.restaurant_id == restaurant_id,
+            Employee.deleted_at.is_(None),
+            Employee.id != manager_id
         )
-        .all()
+        .count()
     )
 
-    for employee in employees:
-        employee.restaurant_id = None
+    if active_staff > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"This restaurant still has {active_staff} employee"
+                f"{'' if active_staff == 1 else 's'}. "
+                "Delete or move them first."
+            )
+        )
+
+    # Previously deleted employees are only hidden; release them from
+    # this restaurant so the row can be removed. Their attendance
+    # history is kept.
+    db.query(Employee).filter(
+        Employee.restaurant_id == restaurant_id
+    ).update(
+        {Employee.restaurant_id: None},
+        synchronize_session=False
+    )
+
+    # Manual attendance requests belong to the restaurant
+    db.query(ManualAttendanceRequest).filter(
+        ManualAttendanceRequest.restaurant_id == restaurant_id
+    ).delete(synchronize_session=False)
 
     db.delete(restaurant)
 

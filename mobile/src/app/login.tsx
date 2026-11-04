@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,11 +11,12 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { setToken, deleteToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');

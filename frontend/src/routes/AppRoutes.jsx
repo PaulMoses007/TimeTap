@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "../pages/Login/Login";
 import Dashboard from "../pages/Dashboard/Dashboard";
 import EmployeeList from "../pages/Employees/EmployeeList";
+import EmployeeDetail from "../pages/Employees/EmployeeDetail";
 import Register from "../pages/Register/Register";
 import RegisterManager from "../pages/RegisterManager/RegisterManager";
 import EmployeeDashboard from "../pages/EmployeeDashboard/EmployeeDashboard";
@@ -29,6 +30,7 @@ function AppRoutes() {
 
         {/* Manager Employees */}
         <Route path="/employees" element={<EmployeeList />} />
+        <Route path="/employees/:id" element={<EmployeeDetail />} />
 
         {/* Manager Attendance */}
         <Route path="/manager-attendance" element={<ManagerAttendance />} />

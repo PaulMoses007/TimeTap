@@ -2,7 +2,6 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -10,9 +9,11 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Platform,
   Text,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 
 import { useFocusEffect, router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -21,7 +22,7 @@ import * as Sharing from 'expo-sharing';
 
 import { getToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 type Restaurant = {
   id: number;
@@ -173,6 +174,25 @@ export default function RestaurantsScreen() {
         return;
       }
 
+      if (Platform.OS === 'web') {
+        // Browsers have no device storage: fetch the image and show it from memory.
+        const response = await fetch(
+          `${API_BASE_URL}/restaurants/${restaurant.id}/qr`,
+          { headers: { Authorization: `Bearer ${token}`, Accept: 'image/png' } },
+        );
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? 'QR image was not found.'
+              : `Could not download QR image. Server returned ${response.status}.`,
+          );
+        }
+        const blob = await response.blob();
+        setQrUri(URL.createObjectURL(blob));
+        setQrRestaurant(restaurant);
+        return;
+      }
+
       if (!FileSystem.cacheDirectory) {
         throw new Error('Device storage is unavailable.');
       }
@@ -218,6 +238,14 @@ export default function RestaurantsScreen() {
     setQrSharing(true);
 
     try {
+      if (Platform.OS === 'web') {
+        const a = document.createElement('a');
+        a.href = qrUri;
+        a.download = `restaurant_${qrRestaurant?.id ?? 'qr'}.png`;
+        a.click();
+        return;
+      }
+
       const available = await Sharing.isAvailableAsync();
 
       if (!available) {
@@ -300,10 +328,6 @@ export default function RestaurantsScreen() {
                 <View style={styles.restaurantHeading}>
                   <Text style={styles.restaurantName}>
                     {restaurant.name}
-                  </Text>
-
-                  <Text style={styles.restaurantNumber}>
-                    Restaurant #{restaurant.id}
                   </Text>
                 </View>
               </View>

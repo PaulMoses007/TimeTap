@@ -46,10 +46,16 @@ def get_employee(current_user: dict, db: Session):
         .first()
     )
 
-    if employee is None:
+    if employee is None or getattr(employee, "deleted_at", None) is not None:
         raise HTTPException(
             status_code=404,
             detail="Employee not found",
+        )
+
+    if not employee.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Employee account is inactive",
         )
 
     return employee
@@ -85,7 +91,7 @@ def check_restaurant_assignment(employee, restaurant_id: int):
         )
 
 
-def check_in(restaurant_id: int, current_user: dict, db: Session):
+def check_in(restaurant_id: int, current_user: dict, db: Session, source: str = "qr"):
     # Find employee
     employee = get_employee(current_user, db)
 
@@ -124,6 +130,7 @@ def check_in(restaurant_id: int, current_user: dict, db: Session):
         worked_minutes=0,
         worked_hours=0,
         status="Present",
+        source=source,
     )
 
     db.add(attendance)
@@ -133,7 +140,7 @@ def check_in(restaurant_id: int, current_user: dict, db: Session):
     return attendance
 
 
-def check_out(restaurant_id: int, current_user: dict, db: Session):
+def check_out(restaurant_id: int, current_user: dict, db: Session, source: str = "qr"):
     # Find employee
     employee = get_employee(current_user, db)
 
@@ -170,6 +177,7 @@ def check_out(restaurant_id: int, current_user: dict, db: Session):
     # Save checkout time
     check_out_time = utc_now()
     attendance.check_out = check_out_time
+    attendance.check_out_source = source
 
     # Calculate duration. Round to the nearest whole minute instead
     # of always rounding down, so displayed duration is more intuitive.

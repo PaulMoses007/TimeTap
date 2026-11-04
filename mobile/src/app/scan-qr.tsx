@@ -4,15 +4,15 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { getToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 type EmployeeProfile = {
   id?: number;
@@ -112,6 +112,7 @@ export default function ScanQRScreen() {
           headers,
           body: JSON.stringify({
             restaurant_id: restaurantId,
+            source: 'qr',
           }),
         },
       );

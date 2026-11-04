@@ -8,12 +8,12 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { Alert } from '../lib/alert';
 import { useRouter } from 'expo-router';
 import { getToken } from '../lib/storage';
 
-const API_BASE_URL = 'https://timetap-backend.onrender.com';
+import { API_BASE_URL } from '../lib/config';
 
 export default function RegisterRestaurantScreen() {
   const router = useRouter();

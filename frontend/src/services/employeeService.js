@@ -57,3 +57,11 @@ export const getEmployeeAttendance = async (employeeId) => {
 
   return response.data;
 };
+
+export const deleteEmployee = async (employeeId) => {
+  const response = await api.delete(
+    `/employees/${employeeId}`
+  );
+
+  return response.data;
+};

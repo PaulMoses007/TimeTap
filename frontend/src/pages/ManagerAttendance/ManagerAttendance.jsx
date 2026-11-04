@@ -20,6 +20,9 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import api from "../../api/axios";
 import ManagerSidebar from "../../components/ManagerSidebar";
+import ManualRequestsPanel from "../../components/ManualRequestsPanel";
+import { getManualRequests } from "../../services/manualAttendanceService";
+import { formatTime } from "../../utils/time";
 
 function ManagerAttendance() {
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ function ManagerAttendance() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingCount, setPendingCount] = useState(0);
 
   const loadAttendance = async (selectedPeriod = period) => {
     try {
@@ -62,9 +66,24 @@ function ManagerAttendance() {
     }
   };
 
+  const loadPendingCount = async () => {
+    try {
+      const pending = await getManualRequests("Pending");
+      setPendingCount(Array.isArray(pending) ? pending.length : 0);
+    } catch {
+      setPendingCount(0);
+    }
+  };
+
   useEffect(() => {
-    loadAttendance(period);
+    if (period !== "requests") {
+      loadAttendance(period);
+    }
   }, [period]);
+
+  useEffect(() => {
+    loadPendingCount();
+  }, []);
 
   const handlePeriodChange = (event, newValue) => {
     setPeriod(newValue);
@@ -72,18 +91,6 @@ function ManagerAttendance() {
 
   const handleRefresh = () => {
     loadAttendance(period);
-  };
-
-  const formatTime = (value) => {
-    if (!value) return "-";
-
-    const utcValue = value.endsWith("Z") ? value : `${value}Z`;
-
-    return new Date(utcValue).toLocaleTimeString("en-GB", {
-      timeZone: "Europe/Riga",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const getStatusColor = (status) => {
@@ -140,6 +147,7 @@ function ManagerAttendance() {
               </Typography>
             </Box>
 
+            {period !== "requests" && (
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -148,6 +156,7 @@ function ManagerAttendance() {
             >
               Refresh
             </Button>
+            )}
           </Box>
 
           <Paper
@@ -166,9 +175,21 @@ function ManagerAttendance() {
               <Tab label="Today" value="today" />
               <Tab label="Weekly" value="weekly" />
               <Tab label="Monthly" value="monthly" />
+              <Tab
+                value="requests"
+                label={
+                  pendingCount > 0
+                    ? `Manual Requests (${pendingCount})`
+                    : "Manual Requests"
+                }
+              />
             </Tabs>
           </Paper>
 
+          {period === "requests" ? (
+            <ManualRequestsPanel onChanged={loadPendingCount} />
+          ) : (
+            <>
           {error && (
             <Alert severity="error" sx={{ mb: 3 }}>
               {error}
@@ -333,6 +354,8 @@ function ManagerAttendance() {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+            </>
           )}
         </Box>
       </Box>
