@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI
+from starlette.routing import Match
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import CORS_EXTRA_ORIGINS
@@ -33,6 +34,39 @@ app = FastAPI(
     version="1.0.0",
     description="TimeTap - Restaurant Attendance Management System"
 )
+
+
+# --------------------------------------------------
+# Trailing slash tolerance
+# --------------------------------------------------
+# The website reaches this API through a Vercel rewrite that does not forward
+# addresses ending in "/". Accept "/dashboard" as well as "/dashboard/" so the
+# same route answers either way, without a redirect (a redirect would drop the
+# login header in the browser).
+
+class TrailingSlashMiddleware:
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            path = scope["path"]
+
+            if len(path) > 1 and not path.endswith("/"):
+                routes = app.router.routes
+                exact = any(r.matches(scope)[0] == Match.FULL for r in routes)
+
+                if not exact:
+                    probe = dict(scope, path=path + "/")
+                    if any(r.matches(probe)[0] == Match.FULL for r in routes):
+                        scope = dict(scope, path=path + "/")
+                        if "raw_path" in scope and scope["raw_path"]:
+                            scope["raw_path"] = scope["raw_path"] + b"/"
+
+        await self.asgi_app(scope, receive, send)
+
+
+app.add_middleware(TrailingSlashMiddleware)
 
 
 # --------------------------------------------------
