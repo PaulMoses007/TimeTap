@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import CORS_EXTRA_ORIGINS
 from app.core.database import Base, engine
 from app.core.migrations import ensure_columns
 
@@ -47,12 +48,7 @@ app.add_middleware(
 
         "https://timetap-mobile-chi.vercel.app",
         "https://timetap-system.vercel.app",
-
-        "https://fuzzy-space-tribble-974vrjrxrxp9pfxjq4-8001.app.github.dev",
-        "https://fuzzy-space-tribble-974vrjrxrxp9pfxjq4-5173.app.github.dev",
-        "https://fuzzy-space-tribble-974vrjrxrxp9pfxjq4-5174.app.github.dev",
-    ],
-    allow_origin_regex=r"https://.*\.app\.github\.dev",
+    ] + CORS_EXTRA_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

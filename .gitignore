@@ -85,3 +85,16 @@ tempCodeRunnerFile.py
 # ------------------------------------------
 backend/timetap.db
 node_modules
+
+# Local env files (never commit these)
+.env.*
+!.env.example
+**/.env
+**/.env.local
+
+# Generated QR images (created by the API on demand)
+backend/qrcodes/
+
+# Expo / React Native
+.expo/
+mobile/dist/
