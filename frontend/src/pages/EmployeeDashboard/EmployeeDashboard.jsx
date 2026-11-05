@@ -25,8 +25,6 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import HistoryIcon from "@mui/icons-material/History";
 import PersonIcon from "@mui/icons-material/Person";
 import LogoutIcon from "@mui/icons-material/Logout";
-import LoginIcon from "@mui/icons-material/Login";
-import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 
 import {
@@ -291,74 +289,6 @@ setAttendance(
 
     initialize();
   }, [navigate]);
-
-  /*
-   * Normal check-in function.
-   */
-  const handleCheckIn = async () => {
-    if (!restaurantId) {
-      setError(
-        "Restaurant information is not available."
-      );
-      return;
-    }
-
-    setProcessing(true);
-    setError("");
-
-    try {
-      const data = await checkIn(restaurantId);
-
-      setAttendance(data);
-
-      setSuccessMessage(
-        "You have successfully checked in."
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err.response?.data?.detail ||
-          "Check-in failed."
-      );
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  /*
-   * Normal check-out function.
-   */
-  const handleCheckOut = async () => {
-    if (!restaurantId) {
-      setError(
-        "Restaurant information is not available."
-      );
-      return;
-    }
-
-    setProcessing(true);
-    setError("");
-
-    try {
-      const data = await checkOut(restaurantId);
-
-      setAttendance(data);
-
-      setSuccessMessage(
-        "You have successfully checked out."
-      );
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err.response?.data?.detail ||
-          "Check-out failed."
-      );
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   /*
    * Open QR scanner.
@@ -1012,62 +942,12 @@ const now = new Date();
                 </Button>
               )}
 
-              {/* NORMAL CHECK IN */}
-              {!isWorking && (
-                <Box>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    startIcon={
-                      processing ? (
-                        <CircularProgress
-                          size={20}
-                          color="inherit"
-                        />
-                      ) : (
-                        <LoginIcon />
-                      )
-                    }
-                    onClick={
-                      handleCheckIn
-                    }
-                    disabled={processing}
-                  >
-                    {processing
-                      ? "Checking In..."
-                      : "Check In Manually"}
-                  </Button>
-                </Box>
-              )}
-
-              {/* NORMAL CHECK OUT */}
-              {isWorking && (
-                <Box>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="large"
-                    startIcon={
-                      processing ? (
-                        <CircularProgress
-                          size={20}
-                          color="inherit"
-                        />
-                      ) : (
-                        <LogoutOutlinedIcon />
-                      )
-                    }
-                    onClick={
-                      handleCheckOut
-                    }
-                    disabled={processing}
-                  >
-                    {processing
-                      ? "Checking Out..."
-                      : "Check Out Manually"}
-                  </Button>
-                </Box>
-              )}
+              {/* OTHER WAYS TO RECORD ATTENDANCE */}
+              <Alert severity="info" sx={{ mt: 1 }}>
+                No QR code at hand? Use the TimeTap mobile app: hold the
+                check-in button for 15 seconds, or send a manual request
+                that your manager approves later.
+              </Alert>
 
               {/* COMPLETED */}
               {isCheckedOut && (
