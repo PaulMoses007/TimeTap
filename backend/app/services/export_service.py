@@ -1,6 +1,7 @@
 """Excel export of employee working hours (weekly or monthly)."""
 
 import calendar
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from io import BytesIO
 from zoneinfo import ZoneInfo
@@ -56,6 +57,7 @@ def build_hours_workbook(
     manager_id: int,
     period: str,
     anchor: date,
+    employee_id: int | None = None,
 ) -> tuple[bytes, str]:
     start, end = period_range(period, anchor)
     days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
@@ -92,6 +94,12 @@ def build_hours_workbook(
                 .order_by(Attendance.work_date, Attendance.check_in)
                 .all()
             )
+
+    if employee_id is not None:
+        employees = [e for e in employees if e.id == employee_id]
+        if not employees:
+            raise LookupError("Employee not found in your restaurant.")
+        records = [r for r in records if r.employee_id == employee_id]
 
     by_employee: dict[int, list[Attendance]] = {employee.id: [] for employee in employees}
     for record in records:
@@ -204,9 +212,57 @@ def build_hours_workbook(
     buffer = BytesIO()
     wb.save(buffer)
 
+    who = ""
+    if employee_id is not None:
+        who = "_" + _safe(f"{employees[0].first_name}_{employees[0].last_name}")
+
     if period == "week":
-        name = f"TimeTap_hours_week_{start:%Y-%m-%d}.xlsx"
+        name = f"TimeTap_hours{who}_week_{start:%Y-%m-%d}.xlsx"
     else:
-        name = f"TimeTap_hours_{start:%Y-%m}.xlsx"
+        name = f"TimeTap_hours{who}_{start:%Y-%m}.xlsx"
 
     return buffer.getvalue(), name
+
+
+def _safe(text: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in text)
+
+
+def build_separate_zip(
+    db: Session,
+    manager_id: int,
+    period: str,
+    anchor: date,
+) -> tuple[bytes, str]:
+    """One workbook per employee, packed in a zip."""
+    restaurant = (
+        db.query(Restaurant).filter(Restaurant.manager_id == manager_id).first()
+    )
+    employees = []
+    if restaurant is not None:
+        employees = (
+            db.query(Employee)
+            .filter(
+                Employee.restaurant_id == restaurant.id,
+                Employee.role != "Manager",
+                Employee.deleted_at.is_(None),
+            )
+            .order_by(Employee.first_name, Employee.last_name)
+            .all()
+        )
+
+    start, _ = period_range(period, anchor)
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for employee in employees:
+            content, name = build_hours_workbook(
+                db, manager_id, period, anchor, employee_id=employee.id
+            )
+            archive.writestr(name, content)
+
+    zip_name = (
+        f"TimeTap_hours_per_employee_week_{start:%Y-%m-%d}.zip"
+        if period == "week"
+        else f"TimeTap_hours_per_employee_{start:%Y-%m}.zip"
+    )
+    return buffer.getvalue(), zip_name

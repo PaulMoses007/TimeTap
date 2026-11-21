@@ -64,8 +64,20 @@ function Reports() {
   const [exportDate, setExportDate] = useState(
     new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Riga" })
   );
+  const [exportWho, setExportWho] = useState("all");
+  const [exportEmployees, setExportEmployees] = useState([]);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+
+  useEffect(() => {
+    api
+      .get("/employees")
+      .then((response) => {
+        const list = Array.isArray(response.data) ? response.data : [];
+        setExportEmployees(list.filter((item) => item.role !== "Manager"));
+      })
+      .catch(() => setExportEmployees([]));
+  }, []);
 
   const handleExport = async () => {
     setExporting(true);
@@ -73,14 +85,22 @@ function Reports() {
 
     try {
       const response = await api.get("/reports/export", {
-        params: { period: exportPeriod, on: exportDate },
+        params: {
+          period: exportPeriod,
+          on: exportDate,
+          ...(exportWho === "separate"
+            ? { separate: true }
+            : exportWho !== "all"
+              ? { employee_id: exportWho }
+              : {}),
+        },
         responseType: "blob",
       });
 
       const disposition = response.headers["content-disposition"] || "";
       const match = disposition.match(/filename="?([^";]+)"?/);
       const filename =
-        match?.[1] || `TimeTap_hours_${exportPeriod}_${exportDate}.xlsx`;
+        match?.[1] || `TimeTap_hours_${exportPeriod}_${exportDate}.${exportWho === "separate" ? "zip" : "xlsx"}`;
 
       const url = window.URL.createObjectURL(response.data);
       const link = document.createElement("a");
@@ -443,6 +463,25 @@ function Reports() {
               </TextField>
 
               <TextField
+                select
+                size="small"
+                label="Employees"
+                value={exportWho}
+                onChange={(event) => setExportWho(event.target.value)}
+                sx={{ minWidth: 260 }}
+              >
+                <MenuItem value="all">All employees (one file)</MenuItem>
+                <MenuItem value="separate">
+                  Each employee in a separate file (zip)
+                </MenuItem>
+                {exportEmployees.map((item) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.first_name} {item.last_name}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
                 size="small"
                 type="date"
                 label={
@@ -467,7 +506,7 @@ function Reports() {
                 disabled={exporting || !exportDate}
                 onClick={handleExport}
               >
-                Download Excel
+                {exportWho === "separate" ? "Download zip" : "Download Excel"}
               </Button>
             </Box>
 

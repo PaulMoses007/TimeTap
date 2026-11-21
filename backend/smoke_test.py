@@ -75,6 +75,14 @@ for period in ("week", "month"):
     rows = [[v for v in row] for row in wb["Summary"].iter_rows(min_row=7, values_only=True)]
     assert any(row[0] for row in rows), rows          # at least the employee row
 assert c.get("/reports/export?period=year", headers=H).status_code == 400
+import zipfile
+emp_id = c.get("/employees/", headers=H).json()[0]["id"]
+one = c.get(f"/reports/export?period=month&employee_id={emp_id}", headers=H)
+assert one.status_code == 200 and one.headers["content-disposition"].count("_") >= 4, one.headers["content-disposition"]
+assert c.get("/reports/export?period=month&employee_id=99999", headers=H).status_code == 404
+zp = c.get("/reports/export?period=week&separate=true", headers=H)
+assert zp.status_code == 200 and zp.headers["content-type"] == "application/zip"
+assert all(n.endswith(".xlsx") for n in zipfile.ZipFile(io.BytesIO(zp.content)).namelist())
 assert c.get("/reports/export?period=week&on=2026-11-04", headers=H).status_code == 200
 assert c.get("/reports/export?period=week", headers=EH).status_code == 403
 assert len(wb["Daily hours"][1]) >= 30 + 2 or period == "week"
