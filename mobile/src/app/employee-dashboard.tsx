@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Alert } from '../lib/alert';
@@ -43,9 +44,39 @@ type AttendanceRecord = {
   check_out_source?: string | null;
 };
 
+type RangeKey = 'week' | 'month' | 'custom' | 'all';
+
+const RANGES: { key: RangeKey; label: string }[] = [
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+  { key: 'custom', label: 'Custom dates' },
+  { key: 'all', label: 'All' },
+];
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+// Plain "YYYY-MM-DD" arithmetic (no time zones involved)
+function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function todayRiga() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Riga' });
+}
+
+function mondayOf(isoDate: string) {
+  const day = new Date(`${isoDate}T12:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(isoDate, -((day + 6) % 7));
+}
+
 export default function EmployeeDashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [range, setRange] = useState<RangeKey>('week');
+  const [fromDate, setFromDate] = useState(() => todayRiga().slice(0, 8) + '01');
+  const [toDate, setToDate] = useState(() => todayRiga());
   const [shifts, setShifts] = useState<
     { id: number; work_date: string; start_time: string; end_time: string; note: string | null }[]
   >([]);
@@ -149,6 +180,45 @@ export default function EmployeeDashboard() {
   }
 
   const isCheckedIn = history.some((record) => record.check_out == null);
+
+  // Attendance History filter: this week, this month, your own dates, or all
+  const today = todayRiga();
+  let rangeStart = '0000-01-01';
+  let rangeEnd = '9999-12-31';
+  let rangeError = '';
+
+  if (range === 'week') {
+    rangeStart = mondayOf(today);
+    rangeEnd = addDays(rangeStart, 6);
+  } else if (range === 'month') {
+    rangeStart = today.slice(0, 8) + '01';
+    // "31" is fine as an upper bound: dates are compared as text
+    rangeEnd = today.slice(0, 8) + '31';
+  } else if (range === 'custom') {
+    if (!DATE_PATTERN.test(fromDate.trim()) || !DATE_PATTERN.test(toDate.trim())) {
+      rangeError = 'Enter both dates like 2026-11-01.';
+    } else if (toDate.trim() < fromDate.trim()) {
+      rangeError = 'The last day cannot be before the first day.';
+    } else {
+      rangeStart = fromDate.trim();
+      rangeEnd = toDate.trim();
+    }
+  }
+
+  const visibleHistory = rangeError
+    ? []
+    : history.filter(
+        (record) => record.work_date >= rangeStart && record.work_date <= rangeEnd,
+      );
+
+  const visibleMinutes = visibleHistory.reduce(
+    (sum, record) =>
+      sum +
+      (record.check_out
+        ? (record.worked_minutes ?? Math.round((record.worked_hours ?? 0) * 60))
+        : 0),
+    0,
+  );
 
   if (loading) {
     return (
@@ -260,11 +330,11 @@ export default function EmployeeDashboard() {
 
           <Text style={styles.info}>
             This week: {hours ? formatMinutes(hours.week.total_minutes) : '—'}
-            {hours ? ` (${hours.week.days_worked} days)` : ''}
+            {hours ? ` (${hours.week.days_worked} ${hours.week.days_worked === 1 ? 'day' : 'days'})` : ''}
           </Text>
           <Text style={styles.info}>
             This month: {hours ? formatMinutes(hours.month.total_minutes) : '—'}
-            {hours ? ` (${hours.month.days_worked} days)` : ''}
+            {hours ? ` (${hours.month.days_worked} ${hours.month.days_worked === 1 ? 'day' : 'days'})` : ''}
           </Text>
         </View>
 
@@ -293,12 +363,67 @@ export default function EmployeeDashboard() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Attendance History</Text>
 
+          <View style={styles.rangeRow}>
+            {RANGES.map((item) => (
+              <Pressable
+                key={item.key}
+                onPress={() => setRange(item.key)}
+                style={[styles.rangeChip, range === item.key && styles.rangeChipActive]}
+              >
+                <Text
+                  style={[styles.rangeText, range === item.key && styles.rangeTextActive]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {range === 'custom' && (
+            <View style={styles.dateRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>From (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={fromDate}
+                  onChangeText={setFromDate}
+                  placeholder="2026-11-01"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>To (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={toDate}
+                  onChangeText={setToDate}
+                  placeholder="2026-11-30"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+          )}
+
+          {rangeError ? (
+            <Text style={styles.rangeError}>{rangeError}</Text>
+          ) : (
+            <Text style={styles.rangeTotal}>
+              {visibleHistory.length} shift{visibleHistory.length === 1 ? '' : 's'} ·{' '}
+              {formatMinutes(visibleMinutes)} worked
+            </Text>
+          )}
+
           {history.length === 0 ? (
             <Text style={styles.info}>
               No attendance records yet. Your shifts will appear here.
             </Text>
+          ) : visibleHistory.length === 0 ? (
+            !rangeError && (
+              <Text style={styles.info}>No attendance records in this period.</Text>
+            )
           ) : (
-            history.map((record) => (
+            visibleHistory.map((record) => (
               <View key={record.id} style={styles.historyItem}>
                 <Text style={styles.historyDate}>{formatDate(record.work_date)}</Text>
 
@@ -342,6 +467,28 @@ export default function EmployeeDashboard() {
 }
 
 const styles = StyleSheet.create({
+  rangeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  rangeChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#EEF2F8',
+  },
+  rangeChipActive: { backgroundColor: '#2463EB' },
+  rangeText: { color: '#506078', fontSize: 14, fontWeight: '600' },
+  rangeTextActive: { color: '#FFFFFF' },
+  dateRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  dateLabel: { color: '#506078', fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#DDE5F0',
+    borderRadius: 12,
+    padding: 10,
+    fontSize: 15,
+    backgroundColor: '#FFFFFF',
+  },
+  rangeTotal: { color: '#173D75', fontSize: 15, fontWeight: '700', marginTop: 14, marginBottom: 4 },
+  rangeError: { color: '#DC2626', fontSize: 14, marginTop: 12 },
   safeArea: { flex: 1, backgroundColor: '#F7F8FC' },
   center: {
     flex: 1,
