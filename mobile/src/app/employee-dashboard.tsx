@@ -46,6 +46,13 @@ type AttendanceRecord = {
 export default function EmployeeDashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [shifts, setShifts] = useState<
+    { id: number; work_date: string; start_time: string; end_time: string; note: string | null }[]
+  >([]);
+  const [hours, setHours] = useState<{
+    week: { total_minutes: number; days_worked: number };
+    month: { total_minutes: number; days_worked: number };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<
@@ -65,6 +72,15 @@ export default function EmployeeDashboard() {
 
       setProfile(user as Profile);
       setHistory(Array.isArray(records) ? records : []);
+
+      // extras: a failure here must not break the check-in screen
+      apiRequest('/roster/my')
+        .then((data) => setShifts(Array.isArray(data) ? (data as typeof shifts) : []))
+        .catch(() => setShifts([]));
+
+      apiRequest('/attendance/my-summary')
+        .then((data) => setHours(data as typeof hours))
+        .catch(() => setHours(null));
     } catch (error) {
       console.error('TimeTap employee dashboard error:', error);
 
@@ -236,6 +252,41 @@ export default function EmployeeDashboard() {
             <Text style={styles.linkButtonText}>
               Request manual attendance
             </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>My hours</Text>
+
+          <Text style={styles.info}>
+            This week: {hours ? formatMinutes(hours.week.total_minutes) : '—'}
+            {hours ? ` (${hours.week.days_worked} days)` : ''}
+          </Text>
+          <Text style={styles.info}>
+            This month: {hours ? formatMinutes(hours.month.total_minutes) : '—'}
+            {hours ? ` (${hours.month.days_worked} days)` : ''}
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>My next shifts</Text>
+
+          {shifts.length === 0 ? (
+            <Text style={styles.info}>No shifts planned for the next two weeks.</Text>
+          ) : (
+            shifts.map((shift) => (
+              <Text key={shift.id} style={styles.info}>
+                {formatDate(shift.work_date)}: {shift.start_time} - {shift.end_time}
+                {shift.note ? ` (${shift.note})` : ''}
+              </Text>
+            ))
+          )}
+
+          <Pressable
+            style={[styles.linkButton, { marginTop: 14 }]}
+            onPress={() => router.push('/leave-request')}
+          >
+            <Text style={styles.linkButtonText}>Request leave</Text>
           </Pressable>
         </View>
 

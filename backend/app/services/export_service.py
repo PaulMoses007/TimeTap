@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.attendance import Attendance
 from app.models.employee import Employee
 from app.models.restaurant import Restaurant
+from app.services.leave_service import approved_leave_by_day
 
 RIGA_TZ = ZoneInfo("Europe/Riga")
 
@@ -113,6 +114,8 @@ def build_hours_workbook(
             raise LookupError("Employee not found in your restaurant.")
         records = [r for r in records if r.employee_id == employee_id]
 
+    leave = approved_leave_by_day(db, [e.id for e in employees], start, end)
+
     by_employee: dict[int, list[Attendance]] = {employee.id: [] for employee in employees}
     for record in records:
         by_employee[record.employee_id].append(record)
@@ -135,7 +138,7 @@ def build_hours_workbook(
     ws["A3"] = f"Period: {title}"
     ws["A4"] = f"Created: {datetime.now(RIGA_TZ):%d.%m.%Y %H:%M} (Riga time)"
 
-    headers = ["Employee", "Code", "Role", "Days worked", "Total hours", "Average hours / day", "Manual entries", "Open (no check-out)"]
+    headers = ["Employee", "Code", "Role", "Days worked", "Total hours", "Average hours / day", "Manual entries", "Open (no check-out)", "Leave days"]
     header_row = 6
     for col, text in enumerate(headers, start=1):
         ws.cell(row=header_row, column=col, value=text)
@@ -157,6 +160,7 @@ def build_hours_workbook(
         ws.cell(row=row, column=6, value=round(total / 60 / len(worked_days), 2) if worked_days else 0)
         ws.cell(row=row, column=7, value=sum(1 for item in items if item.source == "manual" or item.check_out_source == "manual"))
         ws.cell(row=row, column=8, value=sum(1 for item in items if item.check_out is None))
+        ws.cell(row=row, column=9, value=len(leave.get(employee.id, {})))
         row += 1
 
     if employees:
@@ -165,7 +169,7 @@ def build_hours_workbook(
     else:
         ws.cell(row=row, column=1, value="No employees found for this restaurant.")
 
-    _widths(ws, [28, 14, 14, 13, 13, 19, 15, 19])
+    _widths(ws, [28, 14, 14, 13, 13, 19, 15, 19, 12])
     ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
 
     # ------------------------------------------------------- Daily hours grid
@@ -185,10 +189,18 @@ def build_hours_workbook(
             per_day[item.work_date] = per_day.get(item.work_date, 0) + minutes_of(item)
         for index, day in enumerate(days, start=2):
             minutes = per_day.get(day)
-            cell = grid.cell(row=r, column=index, value=round(minutes / 60, 2) if minutes else None)
+            on_leave = leave.get(employee.id, {}).get(day)
+            cell = grid.cell(
+                row=r,
+                column=index,
+                value=round(minutes / 60, 2) if minutes else ("L" if on_leave else None),
+            )
             cell.alignment = Alignment(horizontal="center")
         total_cell = grid.cell(row=r, column=total_col, value=round(sum(per_day.values()) / 60, 2))
         total_cell.font = TOTAL_FONT
+
+    note_row = len(employees) + 3
+    grid.cell(row=note_row, column=1, value="L = approved leave (sick, vacation or day off)")
 
     _widths(grid, [28] + [8] * len(days) + [10])
     grid.freeze_panes = "B2"

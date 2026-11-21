@@ -11,3 +11,4 @@ class DashboardResponse(BaseModel):
 
     working_now: int
     absent_today: int
+    on_leave_today: int = 0

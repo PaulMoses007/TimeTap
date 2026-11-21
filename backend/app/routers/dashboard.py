@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from app.models.employee import Employee
 from app.models.restaurant import Restaurant
 from app.schemas.dashboard import DashboardResponse
 from app.security.roles import require_manager
+from app.services.alerts_service import build_alerts
+from app.services.leave_service import approved_leave_by_day
 
 
 router = APIRouter(
@@ -117,7 +120,7 @@ def dashboard(
     # TODAY'S ATTENDANCE
     # ==========================================================
 
-    today = date.today()
+    today = datetime.now(ZoneInfo("Europe/Riga")).date()
 
     today_attendance = (
         db.query(Attendance)
@@ -164,8 +167,23 @@ def dashboard(
     # ABSENT
     # ==========================================================
 
+    active_ids = [
+        e.id
+        for e in db.query(Employee)
+        .filter(
+            Employee.restaurant_id == restaurant_id,
+            Employee.role != "Manager",
+            Employee.is_active == True
+        )
+        .all()
+    ]
+
+    on_leave_today = len(
+        approved_leave_by_day(db, active_ids, today, today)
+    )
+
     absent_today = (
-        total_employees - checked_in_today
+        total_employees - checked_in_today - on_leave_today
     )
 
     if absent_today < 0:
@@ -183,4 +201,14 @@ def dashboard(
         "checked_out_today": checked_out_today,
         "working_now": working_now,
         "absent_today": absent_today,
+        "on_leave_today": on_leave_today,
     }
+
+
+@router.get("/alerts")
+def dashboard_alerts(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    """Late arrivals, forgotten check-outs and things waiting for approval."""
+    return build_alerts(db, current_user["id"])

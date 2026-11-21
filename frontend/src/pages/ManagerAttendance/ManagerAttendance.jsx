@@ -21,6 +21,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import api from "../../api/axios";
 import ManagerSidebar from "../../components/ManagerSidebar";
 import ManualRequestsPanel from "../../components/ManualRequestsPanel";
+import LeaveRequestsPanel from "../../components/LeaveRequestsPanel";
+import { getLeaveRequests } from "../../services/leaveService";
 import { getManualRequests } from "../../services/manualAttendanceService";
 import { formatTime } from "../../utils/time";
 
@@ -31,6 +33,7 @@ function ManagerAttendance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pendingCount, setPendingCount] = useState(0);
+  const [leaveCount, setLeaveCount] = useState(0);
 
   const loadAttendance = async (selectedPeriod = period) => {
     try {
@@ -75,14 +78,24 @@ function ManagerAttendance() {
     }
   };
 
+  const loadLeaveCount = async () => {
+    try {
+      const pending = await getLeaveRequests("Pending");
+      setLeaveCount(Array.isArray(pending) ? pending.length : 0);
+    } catch {
+      setLeaveCount(0);
+    }
+  };
+
   useEffect(() => {
-    if (period !== "requests") {
+    if (period !== "requests" && period !== "leave") {
       loadAttendance(period);
     }
   }, [period]);
 
   useEffect(() => {
     loadPendingCount();
+    loadLeaveCount();
   }, []);
 
   const handlePeriodChange = (event, newValue) => {
@@ -147,7 +160,7 @@ function ManagerAttendance() {
               </Typography>
             </Box>
 
-            {period !== "requests" && (
+            {period !== "requests" && period !== "leave" && (
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -183,11 +196,21 @@ function ManagerAttendance() {
                     : "Manual Requests"
                 }
               />
+              <Tab
+                value="leave"
+                label={
+                  leaveCount > 0
+                    ? `Leave Requests (${leaveCount})`
+                    : "Leave Requests"
+                }
+              />
             </Tabs>
           </Paper>
 
           {period === "requests" ? (
             <ManualRequestsPanel onChanged={loadPendingCount} />
+          ) : period === "leave" ? (
+            <LeaveRequestsPanel onChanged={loadLeaveCount} />
           ) : (
             <>
           {error && (

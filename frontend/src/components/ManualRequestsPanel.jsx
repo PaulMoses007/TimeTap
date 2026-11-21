@@ -267,7 +267,7 @@ function ManualRequestsPanel({ onChanged }) {
                 label="Note to employee (optional)"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                inputProps={{ maxLength: 500 }}
+                slotProps={{ htmlInput: { maxLength: 500 } }}
               />
             </>
           )}

@@ -18,9 +18,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import GroupsIcon from "@mui/icons-material/Groups";
+import BeachAccessIcon from "@mui/icons-material/BeachAccess";
 
 import { getDashboard } from "../../services/dashboardService";
 import ManagerSidebar from "../../components/ManagerSidebar";
+import AlertsCard from "../../components/AlertsCard";
 
 function Dashboard() {
   const [data, setData] = useState(null);
@@ -101,7 +103,13 @@ function Dashboard() {
       title: "Absent Today",
       value: data.absent_today,
       icon: <PersonOffIcon />,
-      description: "Employees not checked in",
+      description: "Not checked in and not on leave",
+    },
+    {
+      title: "On Leave Today",
+      value: data.on_leave_today ?? 0,
+      icon: <BeachAccessIcon />,
+      description: "Approved leave",
     },
     {
       title: "Pending Approvals",
@@ -174,6 +182,9 @@ function Dashboard() {
               M
             </Avatar>
           </Box>
+
+          {/* ALERTS */}
+          <AlertsCard />
 
           {/* STATISTICS CARDS */}
           <Grid container spacing={3}>

@@ -13,6 +13,7 @@ import {
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import PeopleIcon from "@mui/icons-material/People";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import PersonIcon from "@mui/icons-material/Person";
@@ -44,6 +45,12 @@ function ManagerSidebar({ activePage }) {
       icon: <AccessTimeIcon />,
       path: "/manager-attendance",
       id: "attendance",
+    },
+    {
+      text: "Roster",
+      icon: <CalendarMonthIcon />,
+      path: "/roster",
+      id: "roster",
     },
     {
       text: "Restaurants",

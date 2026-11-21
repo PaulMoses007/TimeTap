@@ -13,6 +13,7 @@ import RestaurantManagement from "../pages/Restaurants/RestaurantManagement";
 import ManagerAttendance from "../pages/ManagerAttendance/ManagerAttendance";
 import ManagerProfile from "../pages/ManagerProfile/ManagerProfile";
 import Reports from "../pages/Reports/Reports";
+import Roster from "../pages/Roster/Roster";
 import Settings from "../pages/Settings/Settings";
 
 function AppRoutes() {
@@ -37,6 +38,9 @@ function AppRoutes() {
 
         {/* Manager Profile */}
         <Route path="/manager-profile" element={<ManagerProfile />} />
+
+        {/* Roster */}
+        <Route path="/roster" element={<Roster />} />
 
         {/* Restaurants */}
         <Route path="/restaurants" element={<RestaurantManagement />} />

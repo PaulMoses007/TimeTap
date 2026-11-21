@@ -34,6 +34,8 @@ import {
 } from "../../services/attendanceService";
 
 import MyHoursCard from "../../components/MyHoursCard";
+import MyLeaveCard from "../../components/MyLeaveCard";
+import MyShiftsCard from "../../components/MyShiftsCard";
 
 const drawerWidth = 300;
 
@@ -567,7 +569,11 @@ if (record.check_out) {
 
           {/* MY HOURS: this week / this month + Excel */}
 
+          <MyShiftsCard />
+
           <MyHoursCard />
+
+          <MyLeaveCard />
 
 
           {/* ATTENDANCE TABLE */}

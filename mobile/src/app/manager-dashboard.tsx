@@ -32,6 +32,10 @@ export default function ManagerDashboard() {
   const [profile, setProfile] = useState<ManagerProfile | null>(null);
 
   const [pendingRequests, setPendingRequests] = useState(0);
+  const [pendingLeave, setPendingLeave] = useState(0);
+  const [alerts, setAlerts] = useState<
+    { type: string; severity: string; title: string; detail?: string }[]
+  >([]);
 
   // refresh the badge every time the dashboard comes back into view
   useFocusEffect(
@@ -39,6 +43,14 @@ export default function ManagerDashboard() {
       apiRequest<unknown[]>('/attendance/manual-requests/?status=Pending')
         .then((data) => setPendingRequests(Array.isArray(data) ? data.length : 0))
         .catch(() => setPendingRequests(0));
+
+      apiRequest<unknown[]>('/leave/?status=Pending')
+        .then((data) => setPendingLeave(Array.isArray(data) ? data.length : 0))
+        .catch(() => setPendingLeave(0));
+
+      apiRequest<{ items: typeof alerts }>('/dashboard/alerts')
+        .then((data) => setAlerts(Array.isArray(data?.items) ? data.items : []))
+        .catch(() => setAlerts([]));
     }, []),
   );
 
@@ -123,6 +135,33 @@ export default function ManagerDashboard() {
         <Text style={styles.subtitle}>
           Manage your restaurant team and attendance.
         </Text>
+
+        {/* Needs your attention: late staff, forgotten check-outs, requests */}
+        <View style={styles.alertsBox}>
+          <Text style={styles.alertsTitle}>Needs your attention</Text>
+
+          {alerts.length === 0 ? (
+            <Text style={styles.alertsClear}>
+              All clear. Nobody is late and nothing is waiting for you.
+            </Text>
+          ) : (
+            alerts.map((item, index) => (
+              <View
+                key={`${item.type}-${index}`}
+                style={[
+                  styles.alertItem,
+                  item.severity === 'error' && styles.alertError,
+                  item.severity === 'warning' && styles.alertWarning,
+                ]}
+              >
+                <Text style={styles.alertText}>{item.title}</Text>
+                {item.detail ? (
+                  <Text style={styles.alertDetail}>{item.detail}</Text>
+                ) : null}
+              </View>
+            ))
+          )}
+        </View>
 
         {/* Manager Profile */}
         <View style={styles.profileCard}>
@@ -262,6 +301,27 @@ export default function ManagerDashboard() {
           </Text>
         </Pressable>
 
+        {/* Leave requests */}
+        <Pressable
+          style={styles.card}
+          onPress={() => router.push('/manager-leave')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.cardTitle}>
+            Leave Requests{pendingLeave > 0 ? ` (${pendingLeave})` : ''}
+          </Text>
+
+          <Text style={styles.cardDescription}>
+            Approve or reject sick days, vacation and days off.
+          </Text>
+
+          <Text style={styles.link}>
+            {pendingLeave > 0
+              ? `${pendingLeave} waiting for review →`
+              : 'Review leave →'}
+          </Text>
+        </Pressable>
+
         {/* Team */}
         <Pressable
           style={styles.card}
@@ -317,6 +377,27 @@ function ProfileRow({
 }
 
 const styles = StyleSheet.create({
+  alertsBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#DDE5F0',
+    marginBottom: 18,
+  },
+  alertsTitle: { color: '#172033', fontSize: 18, fontWeight: '800', marginBottom: 10 },
+  alertsClear: { color: '#166534', fontSize: 14, lineHeight: 20 },
+  alertItem: {
+    backgroundColor: '#E0F2FE',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  alertError: { backgroundColor: '#FEE2E2' },
+  alertWarning: { backgroundColor: '#FEF3C7' },
+  alertText: { color: '#172033', fontSize: 14, fontWeight: '700' },
+  alertDetail: { color: '#506078', fontSize: 13, marginTop: 2, lineHeight: 18 },
+
   safeArea: {
     flex: 1,
     backgroundColor: '#F7F8FC',

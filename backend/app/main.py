@@ -10,11 +10,15 @@ from app.core.migrations import ensure_columns
 from app.models.employee import Employee
 from app.models.attendance import Attendance, ManualAttendanceRequest
 from app.models.restaurant import Restaurant
+from app.models.leave import LeaveRequest  # noqa: F401  (creates the table)
+from app.models.roster import Shift  # noqa: F401  (creates the table)
 
 from app.routers.auth import router as auth_router
 from app.routers.employee import router as employee_router
 from app.routers.attendance import router as attendance_router
 from app.routers.attendance_edit import router as attendance_edit_router
+from app.routers.leave import router as leave_router
+from app.routers.roster import router as roster_router
 from app.routers.manual_attendance import router as manual_attendance_router
 from app.routers.restaurant import router as restaurant_router
 from app.routers.report import router as report_router
@@ -99,6 +103,8 @@ app.include_router(auth_router)
 app.include_router(employee_router)
 app.include_router(attendance_router)
 app.include_router(attendance_edit_router)
+app.include_router(leave_router)
+app.include_router(roster_router)
 app.include_router(manual_attendance_router)
 app.include_router(restaurant_router)
 app.include_router(report_router)
