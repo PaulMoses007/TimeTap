@@ -32,6 +32,9 @@ export default function AddEmployeeScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Employee');
   const [restaurantId, setRestaurantId] = useState<number | null>(null);
+  const [scheduleType, setScheduleType] = useState<'Flexible' | 'Fixed'>('Flexible');
+  const [shiftStart, setShiftStart] = useState('09:00');
+  const [shiftEnd, setShiftEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
 
   useFocusEffect(
@@ -82,6 +85,25 @@ export default function AddEmployeeScreen() {
       return;
     }
 
+    if (scheduleType === 'Fixed') {
+      const valid = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+      if (!valid.test(shiftStart.trim()) || !valid.test(shiftEnd.trim())) {
+        Alert.alert('Shift times', 'Enter the shift times like 09:00 and 17:00.');
+        return;
+      }
+
+      const toMinutes = (value: string) => {
+        const [hours, minutes] = value.trim().split(':').map(Number);
+        return hours * 60 + minutes;
+      };
+
+      if (toMinutes(shiftStart) >= toMinutes(shiftEnd)) {
+        Alert.alert('Shift times', 'Shift end must be later than shift start.');
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -95,6 +117,9 @@ export default function AddEmployeeScreen() {
           role,
           password,
           restaurant_id: restaurantId,
+          schedule_type: scheduleType,
+          shift_start: scheduleType === 'Fixed' ? shiftStart.trim() : null,
+          shift_end: scheduleType === 'Fixed' ? shiftEnd.trim() : null,
         },
       });
 
@@ -192,6 +217,45 @@ export default function AddEmployeeScreen() {
                   </Pressable>
                 ))}
               </View>
+            )}
+
+            <Text style={styles.label}>Work schedule</Text>
+            <View style={styles.chipRow}>
+              {(['Flexible', 'Fixed'] as const).map((item) => (
+                <Pressable
+                  key={item}
+                  onPress={() => setScheduleType(item)}
+                  style={[styles.chip, scheduleType === item && styles.chipActive]}
+                >
+                  <Text
+                    style={[styles.chipText, scheduleType === item && styles.chipTextActive]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {scheduleType === 'Fixed' && (
+              <>
+                <Text style={styles.label}>Shift start (HH:MM)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={shiftStart}
+                  onChangeText={setShiftStart}
+                  placeholder="09:00"
+                  autoCapitalize="none"
+                />
+
+                <Text style={styles.label}>Shift end (HH:MM)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={shiftEnd}
+                  onChangeText={setShiftEnd}
+                  placeholder="17:00"
+                  autoCapitalize="none"
+                />
+              </>
             )}
 
             <Text style={styles.label}>Password</Text>

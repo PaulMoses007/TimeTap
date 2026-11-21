@@ -27,6 +27,58 @@ d = (date.today()-timedelta(days=1)).isoformat()
 req = ok(c.post("/attendance/manual-requests/", headers=EH, json={"check_in":f"{d}T09:00:00","check_out":f"{d}T17:00:00","reason":"Phone off"}))
 ok(c.put(f"/attendance/manual-requests/{req['id']}/approve", headers=H, json={"note":"OK"}))
 assert any(x["status"]=="Approved" for x in ok(c.get("/attendance/manual-requests/my", headers=EH)))
+# --- schedule rules when a manager adds or edits an employee
+def new_employee(email, **extra):
+    body = {"first_name":"Sch","last_name":"Edule","email":email,"phone":"+37120000004","role":"Waiter",
+            "restaurant_id":rid,"password":"Passw0rd!x"}
+    body.update(extra)
+    return c.post("/employees/", headers=H, json=body)
+
+fixed = ok(new_employee("fixed@test.com", schedule_type="Fixed", shift_start="9:00", shift_end="17:30"))
+assert (fixed["schedule_type"], fixed["shift_start"], fixed["shift_end"]) == ("Fixed", "09:00", "17:30"), fixed
+assert new_employee("bad1@test.com", schedule_type="Fixed", shift_start="17:00", shift_end="09:00").status_code == 400
+assert new_employee("bad2@test.com", schedule_type="Fixed").status_code == 400
+assert new_employee("bad3@test.com", schedule_type="Fixed", shift_start="25:00", shift_end="26:00").status_code == 400
+assert new_employee("bad4@test.com", schedule_type="Sometimes").status_code == 400
+flex = ok(new_employee("flex@test.com", schedule_type="Flexible", shift_start="09:00", shift_end="17:00"))
+assert (flex["schedule_type"], flex["shift_start"], flex["shift_end"]) == ("Flexible", None, None), flex
+
+changed = ok(c.put(f"/employees/{flex['id']}", headers=H, json={
+    "first_name":"Sch","last_name":"Edule","email":"flex@test.com","phone":"+37120000004","role":"Waiter",
+    "is_active":True,"restaurant_id":rid,"schedule_type":"Fixed","shift_start":"10:00","shift_end":"18:00"}))
+assert (changed["schedule_type"], changed["shift_start"]) == ("Fixed", "10:00"), changed
+assert c.put(f"/employees/{flex['id']}", headers=H, json={
+    "first_name":"Sch","last_name":"Edule","email":"flex@test.com","phone":"+37120000004","role":"Waiter",
+    "is_active":True,"restaurant_id":rid,"schedule_type":"Fixed","shift_start":"18:00","shift_end":"10:00"}).status_code == 400
+ok(c.delete(f"/employees/{fixed['id']}", headers=H))
+ok(c.delete(f"/employees/{flex['id']}", headers=H))
+
+# --- manager edits own profile
+me = ok(c.put("/employees/me/profile", headers=H, json={"first_name":"Mia","last_name":"Manager","email":"m@test.com","phone":"+37120009999"}))
+assert (me["first_name"], me["phone"]) == ("Mia", "+37120009999"), me
+assert ok(c.get("/employees/me", headers=H))["last_name"] == "Manager"
+assert c.put("/employees/me/profile", headers=H, json={"first_name":"Mia","last_name":"Manager","email":"e@test.com","phone":"+37120009999"}).status_code == 400  # email taken
+assert c.put("/employees/me/profile", headers=EH, json={"first_name":"X","last_name":"Y","email":"e@test.com","phone":"1"}).status_code == 403  # employees cannot use it
+
+# --- a manager has one restaurant: a second one is refused with a clear message
+second = c.post("/restaurants/", headers=H, json={"name":"Second","address":"Riga","phone":"+37120000005","email":"s@test.com"})
+assert second.status_code == 400 and "already have a restaurant" in second.json()["detail"], second.text
+
+# --- Excel export of working hours
+import io, openpyxl
+for period in ("week", "month"):
+    r = c.get(f"/reports/export?period={period}", headers=H)
+    assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"], r.text[:200]
+    assert "attachment" in r.headers["content-disposition"] and ".xlsx" in r.headers["content-disposition"]
+    wb = openpyxl.load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames == ["Summary", "Daily hours", "Details"], wb.sheetnames
+    rows = [[v for v in row] for row in wb["Summary"].iter_rows(min_row=7, values_only=True)]
+    assert any(row[0] for row in rows), rows          # at least the employee row
+assert c.get("/reports/export?period=year", headers=H).status_code == 400
+assert c.get("/reports/export?period=week&on=2026-11-04", headers=H).status_code == 200
+assert c.get("/reports/export?period=week", headers=EH).status_code == 403
+assert len(wb["Daily hours"][1]) >= 30 + 2 or period == "week"
+
 assert c.delete(f"/restaurants/{rid}", headers=H).status_code == 400   # still has an employee
 ok(c.delete(f"/employees/{e['id']}", headers=H))
 ok(c.delete(f"/restaurants/{rid}", headers=H))

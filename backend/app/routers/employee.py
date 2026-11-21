@@ -17,6 +17,7 @@ from app.security.password import hash_password, verify_password
 from app.security.dependencies import get_current_user
 from app.security.roles import require_manager
 from app.utils.employee_code import generate_employee_code
+from app.utils.schedule import validate_schedule
 
 
 router = APIRouter(
@@ -114,6 +115,12 @@ def create_employee(
             detail="Email already registered."
         )
 
+    schedule_type, shift_start, shift_end = validate_schedule(
+        employee.schedule_type,
+        employee.shift_start,
+        employee.shift_end
+    )
+
     employee_code = generate_employee_code(
         employee.role,
         employee.restaurant_id,
@@ -129,9 +136,9 @@ def create_employee(
         role=employee.role,
         restaurant_id=employee.restaurant_id,
         password_hash=hash_password(employee.password),
-        schedule_type=employee.schedule_type,
-        shift_start=employee.shift_start,
-        shift_end=employee.shift_end,
+        schedule_type=schedule_type,
+        shift_start=shift_start,
+        shift_end=shift_end,
         approval_status="Approved",
         approved_by=manager_id,
         approved_at=datetime.utcnow(),
@@ -519,6 +526,12 @@ def update_employee(
             detail="Email already registered."
         )
 
+    schedule_type, shift_start, shift_end = validate_schedule(
+        employee_data.schedule_type,
+        employee_data.shift_start,
+        employee_data.shift_end
+    )
+
     restaurant_changed = (
         employee.restaurant_id != employee_data.restaurant_id
     )
@@ -534,9 +547,9 @@ def update_employee(
     employee.role = employee_data.role
     employee.is_active = employee_data.is_active
     employee.restaurant_id = employee_data.restaurant_id
-    employee.schedule_type = employee_data.schedule_type
-    employee.shift_start = employee_data.shift_start
-    employee.shift_end = employee_data.shift_end
+    employee.schedule_type = schedule_type
+    employee.shift_start = shift_start
+    employee.shift_end = shift_end
 
     if restaurant_changed or role_changed:
         employee.employee_id = generate_employee_code(

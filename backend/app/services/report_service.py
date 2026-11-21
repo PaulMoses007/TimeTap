@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.attendance import Attendance
 from app.models.employee import Employee
+from app.models.restaurant import Restaurant
 
 
 def get_attendance_report(
@@ -11,6 +12,7 @@ def get_attendance_report(
     work_date: date | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    manager_id: int | None = None,
 ):
     query = (
         db.query(Attendance, Employee)
@@ -19,6 +21,13 @@ def get_attendance_report(
             Attendance.employee_id == Employee.id
         )
     )
+
+    # Only the manager's own restaurant
+    if manager_id is not None:
+        query = query.join(
+            Restaurant,
+            Employee.restaurant_id == Restaurant.id
+        ).filter(Restaurant.manager_id == manager_id)
 
     # Filter by employee
     if employee_id is not None:

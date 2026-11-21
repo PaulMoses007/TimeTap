@@ -10,6 +10,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  MenuItem,
   Paper,
   Table,
   TableBody,
@@ -17,12 +18,14 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 
 import PeopleIcon from "@mui/icons-material/People";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import DownloadIcon from "@mui/icons-material/Download";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import WarningIcon from "@mui/icons-material/Warning";
@@ -55,6 +58,44 @@ function Reports() {
   const [workforceInsights, setWorkforceInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Excel export of working hours
+  const [exportPeriod, setExportPeriod] = useState("week");
+  const [exportDate, setExportDate] = useState(
+    new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Riga" })
+  );
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError("");
+
+    try {
+      const response = await api.get("/reports/export", {
+        params: { period: exportPeriod, on: exportDate },
+        responseType: "blob",
+      });
+
+      const disposition = response.headers["content-disposition"] || "";
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      const filename =
+        match?.[1] || `TimeTap_hours_${exportPeriod}_${exportDate}.xlsx`;
+
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Could not create the Excel file. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
 
   // ============================================================
@@ -365,6 +406,76 @@ function Reports() {
           </Button>
 
         </Box>
+
+
+        {/* ==================================================== */}
+        {/* EXCEL EXPORT */}
+        {/* ==================================================== */}
+
+        <Card sx={{ mb: 4, borderRadius: 3 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold">
+              Download working hours (Excel)
+            </Typography>
+
+            <Typography color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+              One file with a summary per employee, hours for every day and
+              every check-in and check-out.
+            </Typography>
+
+            {exportError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {exportError}
+              </Alert>
+            )}
+
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+              <TextField
+                select
+                size="small"
+                label="Period"
+                value={exportPeriod}
+                onChange={(event) => setExportPeriod(event.target.value)}
+                sx={{ minWidth: 160 }}
+              >
+                <MenuItem value="week">Weekly</MenuItem>
+                <MenuItem value="month">Monthly</MenuItem>
+              </TextField>
+
+              <TextField
+                size="small"
+                type="date"
+                label={
+                  exportPeriod === "week"
+                    ? "Any day in the week"
+                    : "Any day in the month"
+                }
+                value={exportDate}
+                onChange={(event) => setExportDate(event.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+
+              <Button
+                variant="contained"
+                startIcon={
+                  exporting ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <DownloadIcon />
+                  )
+                }
+                disabled={exporting || !exportDate}
+                onClick={handleExport}
+              >
+                Download Excel
+              </Button>
+            </Box>
+
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: "block" }}>
+              Weeks run Monday to Sunday. Times are Riga time.
+            </Typography>
+          </CardContent>
+        </Card>
 
 
         {/* ==================================================== */}

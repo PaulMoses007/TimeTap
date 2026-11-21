@@ -53,6 +53,8 @@ import { getRestaurants } from "../../services/restaurantService";
 import ManagerSidebar from "../../components/ManagerSidebar";
 import { formatDate, formatMinutes, formatTime } from "../../utils/time";
 import SourceChip from "../../components/SourceChip";
+import ScheduleFields from "../../components/ScheduleFields";
+import { validateSchedule, scheduleForRequest } from "../../utils/schedule";
 
 
 function EmployeeList() {
@@ -90,6 +92,9 @@ function EmployeeList() {
     role: "Employee",
     restaurant_id: "",
     password: "",
+    schedule_type: "Flexible",
+    shift_start: "",
+    shift_end: "",
   });
 
 
@@ -180,6 +185,9 @@ function EmployeeList() {
       restaurant_id:
         restaurants.length === 1 ? String(restaurants[0].id) : "",
       password: "",
+      schedule_type: "Flexible",
+      shift_start: "",
+      shift_end: "",
     });
 
     setOpenDialog(true);
@@ -210,9 +218,23 @@ function EmployeeList() {
         return;
       }
 
+      const scheduleError = validateSchedule(formData);
+
+      if (scheduleError) {
+        setError(scheduleError);
+        setSaving(false);
+        return;
+      }
+
       await createEmployee({
-        ...formData,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        password: formData.password,
         restaurant_id: Number(formData.restaurant_id),
+        ...scheduleForRequest(formData),
       });
 
       setOpenDialog(false);
@@ -359,6 +381,13 @@ function EmployeeList() {
       return;
     }
 
+    const scheduleError = validateSchedule(editingEmployee);
+
+    if (scheduleError) {
+      setError(scheduleError);
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -375,13 +404,7 @@ function EmployeeList() {
           restaurant_id: editRestaurantId
             ? Number(editRestaurantId)
             : null,
-          schedule_type:
-            editingEmployee.schedule_type ||
-            "Flexible",
-          shift_start:
-            editingEmployee.shift_start || null,
-          shift_end:
-            editingEmployee.shift_end || null,
+          ...scheduleForRequest(editingEmployee),
         }
       );
 
@@ -390,7 +413,7 @@ function EmployeeList() {
       setEditRestaurantId("");
 
       setSuccessMessage(
-        "Employee restaurant assignment updated successfully."
+        "Employee updated successfully."
       );
 
       await loadEmployees();
@@ -572,7 +595,7 @@ function EmployeeList() {
 
 
           {/* ERROR */}
-          {error && (
+          {error && !openDialog && !editDialogOpen && (
             <Alert
               severity="error"
               sx={{ mb: 3 }}
@@ -926,6 +949,17 @@ function EmployeeList() {
 
             <DialogContent>
 
+            {error && (
+              <Alert
+                severity="error"
+                sx={{ mb: 2 }}
+                onClose={() => setError("")}
+              >
+                {error}
+              </Alert>
+            )}
+
+
               <Typography
                 variant="body2"
                 color="text.secondary"
@@ -1042,6 +1076,17 @@ function EmployeeList() {
                   ))}
                 </Select>
               </FormControl>
+
+              <ScheduleFields
+                value={formData}
+                onChange={(schedule) =>
+                  setFormData((previous) => ({
+                    ...previous,
+                    ...schedule,
+                  }))
+                }
+              />
+
               <TextField
                 fullWidth
                 required
@@ -1100,7 +1145,7 @@ function EmployeeList() {
 
 
         {/* ================================================ */}
-        {/* EDIT EMPLOYEE / RESTAURANT DIALOG */}
+        {/* EDIT EMPLOYEE DIALOG (restaurant and schedule) */}
         {/* ================================================ */}
 
         <Dialog
@@ -1116,6 +1161,17 @@ function EmployeeList() {
 
 
           <DialogContent>
+
+            {error && (
+              <Alert
+                severity="error"
+                sx={{ mb: 2 }}
+                onClose={() => setError("")}
+              >
+                {error}
+              </Alert>
+            )}
+
 
             {editingEmployee && (
 
@@ -1179,6 +1235,16 @@ function EmployeeList() {
                   </Select>
 
                 </FormControl>
+
+                <ScheduleFields
+                  value={editingEmployee}
+                  onChange={(schedule) =>
+                    setEditingEmployee((previous) => ({
+                      ...previous,
+                      ...schedule,
+                    }))
+                  }
+                />
 
               </>
 

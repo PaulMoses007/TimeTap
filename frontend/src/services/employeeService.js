@@ -65,3 +65,8 @@ export const deleteEmployee = async (employeeId) => {
 
   return response.data;
 };
+
+export const updateMyProfile = async (profile) => {
+  const response = await api.put("/employees/me/profile", profile);
+  return response.data;
+};
