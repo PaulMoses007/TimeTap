@@ -571,12 +571,19 @@ def attendance_history(
     current_user=Depends(require_manager)
 ):
     """
-    Return all attendance records.
+    Return attendance records of the manager's own restaurant.
 
     Only managers can access this endpoint.
     """
 
-    return get_all_attendance(db)
+    return (
+        db.query(Attendance)
+        .join(Employee, Attendance.employee_id == Employee.id)
+        .join(Restaurant, Employee.restaurant_id == Restaurant.id)
+        .filter(Restaurant.manager_id == current_user["id"])
+        .order_by(Attendance.work_date.desc())
+        .all()
+    )
 
 
 # ============================================================

@@ -33,6 +33,8 @@ import {
   getMyAttendance,
 } from "../../services/attendanceService";
 
+import MyHoursCard from "../../components/MyHoursCard";
+
 const drawerWidth = 300;
 
 function EmployeeAttendance() {
@@ -561,6 +563,11 @@ if (record.check_out) {
               {error}
             </Alert>
           )}
+
+
+          {/* MY HOURS: this week / this month + Excel */}
+
+          <MyHoursCard />
 
 
           {/* ATTENDANCE TABLE */}

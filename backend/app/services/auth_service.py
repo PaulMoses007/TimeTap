@@ -6,13 +6,22 @@ from sqlalchemy.orm import Session
 from app.models.employee import Employee
 from app.schemas.auth import LoginRequest
 from app.security.jwt import create_access_token
+from app.security.login_limiter import (
+    check_allowed,
+    make_key,
+    record_failure,
+    record_success,
+)
 from app.security.password import verify_password
 
 
 class AuthService:
 
     @staticmethod
-    def login(login_data: LoginRequest, db: Session):
+    def login(login_data: LoginRequest, db: Session, client_ip: str | None = None):
+
+        key = make_key(login_data.email, client_ip)
+        check_allowed(key)
 
         employee = (
             db.query(Employee)
@@ -21,6 +30,7 @@ class AuthService:
         )
 
         if employee is None:
+            record_failure(key)
             raise HTTPException(
                 status_code=401,
                 detail="Invalid email or password"
@@ -30,10 +40,13 @@ class AuthService:
             login_data.password,
             employee.password_hash
         ):
+            record_failure(key)
             raise HTTPException(
                 status_code=401,
                 detail="Invalid email or password"
             )
+
+        record_success(key)
 
         if not employee.is_active:
             raise HTTPException(

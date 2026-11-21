@@ -61,6 +61,10 @@ class Attendance(Base):
         nullable=True
     )
 
+    # Set when a manager corrected or added this record
+    edit_note = Column(Text, nullable=True)
+    edited_by = Column(Integer, nullable=True)
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow

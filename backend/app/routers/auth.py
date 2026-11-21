@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
@@ -28,9 +28,19 @@ def get_db():
 )
 def login(
     login_data: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    # Behind Vercel/Render the real address is in X-Forwarded-For
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_ip = (
+        forwarded.split(",")[0].strip()
+        if forwarded
+        else (request.client.host if request.client else None)
+    )
+
     return AuthService.login(
         login_data,
-        db
+        db,
+        client_ip
     )

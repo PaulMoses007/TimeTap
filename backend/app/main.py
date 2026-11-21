@@ -14,6 +14,7 @@ from app.models.restaurant import Restaurant
 from app.routers.auth import router as auth_router
 from app.routers.employee import router as employee_router
 from app.routers.attendance import router as attendance_router
+from app.routers.attendance_edit import router as attendance_edit_router
 from app.routers.manual_attendance import router as manual_attendance_router
 from app.routers.restaurant import router as restaurant_router
 from app.routers.report import router as report_router
@@ -97,6 +98,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(employee_router)
 app.include_router(attendance_router)
+app.include_router(attendance_edit_router)
 app.include_router(manual_attendance_router)
 app.include_router(restaurant_router)
 app.include_router(report_router)

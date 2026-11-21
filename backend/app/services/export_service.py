@@ -58,13 +58,25 @@ def build_hours_workbook(
     period: str,
     anchor: date,
     employee_id: int | None = None,
+    self_employee: Employee | None = None,
 ) -> tuple[bytes, str]:
+    """
+    Manager export (manager_id) or an employee's own export (self_employee).
+    """
     start, end = period_range(period, anchor)
     days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
 
-    restaurant = (
-        db.query(Restaurant).filter(Restaurant.manager_id == manager_id).first()
-    )
+    if self_employee is not None:
+        restaurant = (
+            db.query(Restaurant)
+            .filter(Restaurant.id == self_employee.restaurant_id)
+            .first()
+        )
+        employee_id = self_employee.id
+    else:
+        restaurant = (
+            db.query(Restaurant).filter(Restaurant.manager_id == manager_id).first()
+        )
 
     employees = []
     records = []

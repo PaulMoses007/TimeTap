@@ -70,3 +70,11 @@ export const updateMyProfile = async (profile) => {
   const response = await api.put("/employees/me/profile", profile);
   return response.data;
 };
+
+export const resetEmployeePassword = async (employeeId) => {
+  const response = await api.post(
+    `/employees/${employeeId}/reset-password`
+  );
+
+  return response.data;
+};

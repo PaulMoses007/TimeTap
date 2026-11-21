@@ -14,6 +14,8 @@ NEW_COLUMNS = [
     ("attendance", "source", "VARCHAR DEFAULT 'qr'"),
     ("attendance", "check_out_source", "VARCHAR"),
     ("employees", "deleted_at", "TIMESTAMP"),
+    ("attendance", "edit_note", "TEXT"),
+    ("attendance", "edited_by", "INTEGER"),
 ]
 
 

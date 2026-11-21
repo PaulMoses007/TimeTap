@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -609,4 +610,54 @@ def delete_employee(
 
     return {
         "message": "Employee deleted successfully"
+    }
+
+
+# Letters and digits without look-alikes (no 0/O, 1/l/I)
+_TEMP_PASSWORD_CHARS = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+@router.post("/{employee_id}/reset-password")
+def reset_employee_password(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_manager)
+):
+    """
+    Manager sets a new temporary password for an employee who forgot theirs.
+    The password is shown once in the response; the employee should change
+    it in My Profile after logging in.
+    """
+    employee = (
+        db.query(Employee)
+        .join(
+            Restaurant,
+            Employee.restaurant_id == Restaurant.id
+        )
+        .filter(
+            Employee.id == employee_id,
+            Employee.role != "Manager",
+            Employee.deleted_at.is_(None),
+            Restaurant.manager_id == current_user["id"]
+        )
+        .first()
+    )
+
+    if employee is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found"
+        )
+
+    temporary = "".join(
+        secrets.choice(_TEMP_PASSWORD_CHARS) for _ in range(10)
+    )
+
+    employee.password_hash = hash_password(temporary)
+    db.commit()
+
+    return {
+        "message": "Password reset.",
+        "email": employee.email,
+        "temporary_password": temporary,
     }

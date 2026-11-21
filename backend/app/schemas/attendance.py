@@ -35,6 +35,14 @@ class AttendanceResponse(BaseModel):
 
     source: str | None = None
     check_out_source: str | None = None
+    edit_note: str | None = None
 
     class Config:
         from_attributes = True
+
+
+# Manager corrects or adds a record. Times are Riga local time.
+class AttendanceEdit(BaseModel):
+    check_in: datetime
+    check_out: datetime | None = None
+    note: str

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { apiRequest } from '../lib/api';
+import { copyText } from '../lib/copy';
 import {
   SOURCE_LABELS,
   formatDate,
@@ -82,6 +83,41 @@ export default function EmployeeDetailScreen() {
       void load();
     }, [load]),
   );
+
+  function confirmReset() {
+    if (!employee) return;
+
+    Alert.alert(
+      'Reset password?',
+      `This creates a new temporary password for ${employee.first_name} ${employee.last_name}. The old password stops working immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create new password',
+          onPress: async () => {
+            try {
+              const result = await apiRequest<{ temporary_password: string }>(
+                `/employees/${employee.id}/reset-password`,
+                { method: 'POST' },
+              );
+
+              const copied = await copyText(result.temporary_password);
+
+              Alert.alert(
+                'Temporary password',
+                `${result.temporary_password}\n\nShown only once${copied ? ' (copied)' : ''}. Give it to ${employee.first_name}; they can change it in their profile after logging in.`,
+              );
+            } catch (error) {
+              Alert.alert(
+                'Could not reset the password',
+                error instanceof Error ? error.message : 'Please try again.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  }
 
   function confirmDelete() {
     if (!employee) return;
@@ -207,6 +243,10 @@ export default function EmployeeDetailScreen() {
           ))
         )}
 
+        <Pressable style={styles.resetButton} onPress={confirmReset}>
+          <Text style={styles.resetText}>Reset password</Text>
+        </Pressable>
+
         <Pressable
           style={[styles.deleteButton, deleting && { opacity: 0.6 }]}
           disabled={deleting}
@@ -262,13 +302,22 @@ const styles = StyleSheet.create({
   recordDate: { color: '#172033', fontSize: 16, fontWeight: '700' },
   recordLine: { color: '#506078', fontSize: 15, marginTop: 6 },
   recordSource: { color: '#64748B', fontSize: 13, marginTop: 4 },
+  resetButton: {
+    borderWidth: 1,
+    borderColor: '#2463EB',
+    padding: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  resetText: { color: '#2463EB', fontSize: 16, fontWeight: '700' },
   deleteButton: {
     borderWidth: 1,
     borderColor: '#DC2626',
     padding: 15,
     borderRadius: 14,
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 14,
   },
   deleteText: { color: '#DC2626', fontSize: 16, fontWeight: '700' },
   back: { alignItems: 'center', padding: 16, marginTop: 8 },
